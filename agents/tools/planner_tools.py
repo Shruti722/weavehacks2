@@ -13,73 +13,40 @@ from datetime import datetime
 POLICY_VAULT_DB = []
 
 
-def evaluate_tradeoffs(analyst_recommendations: List[Dict], constraints: Dict) -> Dict:
+def get_top_deficit_nodes(grid_state: Dict, limit: int = 5) -> Dict:
     """
-    Help Planner evaluate tradeoffs between competing objectives.
-    Should we help many nodes a little, or few nodes a lot?
-
-    Returns strategic insights about allocation strategies.
+    Simple tool: Get nodes with biggest deficits.
+    Returns top N nodes that need help most.
     """
-    total_deficit = sum(r.get("deficit_mw", 0) for r in analyst_recommendations)
-    node_count = len(analyst_recommendations)
+    nodes = grid_state.get("nodes", {})
 
-    # Get constraints
-    available_storage_mw = constraints.get("available_storage_mw", 50)
-    max_demand_response_mw = constraints.get("max_demand_response_mw", 20)
-    equity_weight = constraints.get("equity_weight", 0.5)  # 0-1, higher = prioritize equity zones
+    # Calculate deficit for each node
+    node_deficits = []
+    for node_id, node_data in nodes.items():
+        demand = node_data.get("demand_mw", 0)
+        supply = node_data.get("supply_mw", 0)
+        deficit = demand - supply
 
-    # Strategy 1: Focus on worst nodes
-    worst_nodes = sorted(analyst_recommendations, key=lambda x: x.get("deficit_mw", 0), reverse=True)[:3]
-    focused_deficit_coverage = sum(n.get("deficit_mw", 0) for n in worst_nodes)
-    focused_nodes_helped = len([n for n in worst_nodes if n.get("deficit_mw", 0) <= available_storage_mw / 3])
+        if deficit > 0:
+            node_deficits.append({
+                "node_id": node_id,
+                "deficit_mw": round(deficit, 1),
+                "is_equity_zone": node_data.get("equity_zone", False)
+            })
 
-    # Strategy 2: Spread across many nodes
-    spread_allocation = available_storage_mw / node_count
-    spread_nodes_helped = len([n for n in analyst_recommendations if n.get("deficit_mw", 0) <= spread_allocation * 1.5])
+    # Sort by deficit
+    node_deficits.sort(key=lambda x: x["deficit_mw"], reverse=True)
+    top_nodes = node_deficits[:limit]
 
-    # Strategy 3: Equity-weighted (prioritize disadvantaged zones)
-    equity_nodes = [n for n in analyst_recommendations if n.get("equity_zone", False)]
-    equity_deficit = sum(n.get("deficit_mw", 0) for n in equity_nodes)
+    total_deficit = sum(n["deficit_mw"] for n in node_deficits)
+    top_deficit = sum(n["deficit_mw"] for n in top_nodes)
 
     return {
+        "top_nodes": top_nodes,
         "total_deficit_mw": round(total_deficit, 1),
-        "available_resources_mw": round(available_storage_mw + max_demand_response_mw, 1),
-        "can_solve_fully": available_storage_mw >= total_deficit,
-        "strategies": {
-            "focused": {
-                "description": f"Target 3 worst nodes with all resources",
-                "nodes_fully_helped": focused_nodes_helped,
-                "deficit_covered_pct": round(focused_deficit_coverage / total_deficit * 100, 1) if total_deficit > 0 else 0,
-                "pros": "Eliminates critical risks quickly",
-                "cons": "Leaves other nodes struggling"
-            },
-            "spread": {
-                "description": f"Distribute {spread_allocation:.1f} MW to each of {node_count} nodes",
-                "nodes_helped": spread_nodes_helped,
-                "deficit_covered_pct": round(min(100, (available_storage_mw / total_deficit) * 100), 1) if total_deficit > 0 else 0,
-                "pros": "Fair distribution, reduces system-wide risk",
-                "cons": "May not fully solve any single node"
-            },
-            "equity_first": {
-                "description": f"Prioritize {len(equity_nodes)} equity zones first",
-                "equity_nodes_count": len(equity_nodes),
-                "equity_deficit_mw": round(equity_deficit, 1),
-                "can_cover_equity": available_storage_mw >= equity_deficit,
-                "pros": "Protects disadvantaged communities",
-                "cons": "May leave commercial zones with deficits"
-            }
-        },
-        "recommendation": (
-            "FOCUSED" if available_storage_mw < total_deficit * 0.3 and focused_nodes_helped >= 2
-            else "EQUITY_FIRST" if equity_weight > 0.6 and len(equity_nodes) > 0
-            else "SPREAD"
-        ),
-        "strategic_insight": (
-            f"With {available_storage_mw:.0f} MW available and {total_deficit:.0f} MW deficit, you can't solve everything. "
-            f"FOCUSED strategy solves {focused_nodes_helped} critical nodes completely. "
-            f"SPREAD helps {spread_nodes_helped}/{node_count} nodes partially. "
-            f"Choose based on: Is preventing cascading failure (focused) or ensuring equity (spread) more important?"
-        )
+        "top_nodes_deficit_mw": round(top_deficit, 1),
+        "coverage_pct": round((top_deficit / total_deficit * 100) if total_deficit > 0 else 0, 1),
+        "insight": f"Top {len(top_nodes)} nodes need {top_deficit:.1f} MW (covering {round((top_deficit / total_deficit * 100) if total_deficit > 0 else 0, 1)}% of total deficit)"
     }
 
 

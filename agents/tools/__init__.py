@@ -15,14 +15,8 @@ from .analyst_tools import (
     anomaly_detection
 )
 from .planner_tools import (
-    # Enhanced strategic tools
-    evaluate_tradeoffs,
-    assess_plan_feasibility,
-    prioritize_by_impact,
-    # Legacy tools
-    simulate_plan,
-    cost_risk_analysis,
-    policy_vault
+    # Simplified tool
+    get_top_deficit_nodes
 )
 from .actuator_tools import (
     # Enhanced execution tools
@@ -47,14 +41,8 @@ __all__ = [
     "risk_scan",
     "anomaly_detection",
 
-    # Planner tools - Enhanced
-    "evaluate_tradeoffs",
-    "assess_plan_feasibility",
-    "prioritize_by_impact",
-    # Planner tools - Legacy
-    "simulate_plan",
-    "cost_risk_analysis",
-    "policy_vault",
+    # Planner tools - Simplified
+    "get_top_deficit_nodes",
 
     # Actuator tools - Enhanced
     "validate_execution_sequence",

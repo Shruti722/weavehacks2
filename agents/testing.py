@@ -112,6 +112,44 @@ def test_multi_agent_workflow(user_prompt: str = None):
         execution_text = actuator_output.get("execution_text", "No execution details")
         print(execution_text[:500] + ("..." if len(execution_text) > 500 else ""))
 
+        # RL Reward output
+        reward_data = actuator_output.get("reward_data", {})
+        if reward_data:
+            print("\n💰 RL REWARD ANALYSIS (Binary Threshold):")
+            print("-" * 70)
+            reward_val = reward_data.get('reward', 0)  # Binary: 0 or 1
+            raw_score = reward_data.get('raw_score', 0)  # Continuous score
+            threshold = reward_data.get('threshold', 0.7)
+
+            # Binary reward display
+            if reward_val == 1.0:
+                print(f"🎯 REWARD: 1 ✅ (SUCCESS)")
+            else:
+                print(f"🎯 REWARD: 0 ❌ (FAILURE)")
+
+            print(f"   Raw Score: {raw_score:.3f} (threshold: {threshold})")
+            print(f"   {'↑ Above threshold' if reward_val == 1.0 else '↓ Below threshold'}")
+
+            # Show component scores
+            print(f"\nComponent Scores (Raw):")
+            print(f"  • Deficit Reduction: {reward_data.get('deficit_score', 0):.3f} (weight: 40%)")
+            print(f"  • Cost Efficiency:   {reward_data.get('cost_score', 0):.3f} (weight: 20%)")
+            print(f"  • Risk Reduction:    {reward_data.get('risk_score', 0):.3f} (weight: 20%)")
+            print(f"  • Fairness:          {reward_data.get('fairness_score', 0):.3f} (weight: 10%)")
+            print(f"  • Violations:        {reward_data.get('violation_score', 0):.3f} (weight: 10%)")
+
+            print(f"\nMetrics:")
+            print(f"  • Total Cost: ${reward_data.get('cost_usd', 0):.2f}")
+            print(f"  • Deficit: {reward_data.get('deficit_before_mw', 0):.1f} → {reward_data.get('deficit_after_mw', 0):.1f} MW (Δ {reward_data.get('deficit_improvement_mw', 0):+.1f})")
+            print(f"  • Risk: {reward_data.get('risk_before', 0):.3f} → {reward_data.get('risk_after', 0):.3f} (Δ {reward_data.get('risk_improvement', 0):+.3f})")
+
+            # Explanation
+            if reward_val == 1.0:
+                print(f"\n✅ Actions were effective - RL agent will be positively reinforced")
+            else:
+                print(f"\n❌ Actions were ineffective - RL agent will adjust strategy")
+                print(f"   Need raw score ≥ {threshold} to succeed (currently {raw_score:.3f})")
+
         # Conversation history - FULL TRANSCRIPT
         print("\n💬 FULL AGENT CONVERSATION:")
         print("=" * 70)

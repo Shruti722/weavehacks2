@@ -8,6 +8,7 @@ Generates realistic time-series data for SF power grid with:
 - Multi-objective cost function
 """
 
+
 import json
 import random
 import math
@@ -584,23 +585,42 @@ class GridSimulator:
         fairness_improvement = fairness_after - fairness_before  # Increased fairness is good
         violations_improvement = violations_before - violations_after  # Fewer violations is good
 
-        # Multi-objective reward
-        reward = (
-            # IMPROVEMENTS (positive rewards for making things better)
-            +deficit_improvement * 10.0           # Big reward for reducing deficit
-            +unserved_improvement * 100.0         # Huge reward for serving more energy
-            +risk_improvement * 50.0              # Reward for reducing risk
-            +fairness_improvement * 20.0          # Reward for improving fairness
-            +violations_improvement * 100.0       # Huge reward for fixing violations
+        # Calculate normalized reward components (each 0-1 scale)
 
-            # COSTS (penalties for expensive/dirty actions)
-            -total_cost / 100.0                   # Penalty for cost (~$0-500 → -0 to -5)
-            -total_emissions / 100.0              # Penalty for emissions
+        # 1. Deficit reduction (0 to 1, where 1 = eliminated all deficit)
+        max_deficit = 100.0  # Assume max deficit is 100 MW
+        deficit_score = max(0, min(1, deficit_improvement / max_deficit)) if deficit_before > 0 else 0.5
 
-            # ABSOLUTE PENALTIES (still bad even if improved)
-            -unserved_after * 50.0                # Still penalize any remaining unserved energy
-            -violations_after * 50.0              # Still penalize any remaining violations
+        # 2. Risk reduction (0 to 1, where 1 = eliminated all risk)
+        risk_score = max(0, min(1, risk_improvement / 1.0)) if risk_before > 0 else 0.5
+
+        # 3. Cost efficiency (0 to 1, where 1 = no cost, 0 = very expensive)
+        max_cost = 1000.0  # Assume max action cost is $1000
+        cost_score = max(0, 1 - (total_cost / max_cost))
+
+        # 4. Fairness improvement (0 to 1)
+        fairness_score = max(0, min(1, 0.5 + fairness_improvement)) if fairness_before > 0 else 0.5
+
+        # 5. Violations penalty (0 to 1, where 1 = no violations)
+        violation_score = 1.0 if violations_after == 0 else max(0, 1 - violations_after / 10.0)
+
+        # Weighted average (normalized to 0-1) - this is the "raw score"
+        raw_score = (
+            deficit_score * 0.40 +      # 40% weight on deficit reduction
+            cost_score * 0.20 +          # 20% weight on cost efficiency
+            risk_score * 0.20 +          # 20% weight on risk reduction
+            fairness_score * 0.10 +      # 10% weight on fairness
+            violation_score * 0.10       # 10% weight on violations
         )
+
+        # Ensure raw score is bounded [0, 1]
+        raw_score = max(0.0, min(1.0, raw_score))
+
+        # BINARY REWARD: Apply 0.7 threshold for RL training
+        # If raw_score >= 0.7 → reward = 1 (success)
+        # If raw_score < 0.7  → reward = 0 (failure)
+        THRESHOLD = 0.7
+        reward = 1.0 if raw_score >= THRESHOLD else 0.0
 
         # Track cumulative metrics
         self.cumulative_cost += total_cost
@@ -608,9 +628,18 @@ class GridSimulator:
         self.cumulative_unserved_energy += unserved_after
 
         return {
-            "reward": round(reward, 2),
+            "reward": reward,  # BINARY: 0 or 1 (for RL training)
+            "raw_score": round(raw_score, 3),  # Continuous score before threshold
+            "threshold": THRESHOLD,
             "cost_usd": round(total_cost, 2),
             "emissions_kg_co2": round(total_emissions, 2),
+
+            # Reward component scores (for debugging)
+            "deficit_score": round(deficit_score, 3),
+            "cost_score": round(cost_score, 3),
+            "risk_score": round(risk_score, 3),
+            "fairness_score": round(fairness_score, 3),
+            "violation_score": round(violation_score, 3),
 
             # BEFORE metrics
             "deficit_before_mw": round(deficit_before, 2),

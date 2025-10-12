@@ -1,0 +1,53 @@
+_wandb:
+    value:
+        cli_version: 0.22.2
+        e:
+            mlrbq67prdgj0nvcc8xk15oglkrtvaxb:
+                apple:
+                    ecpuCores: 6
+                    gpuCores: 14
+                    memoryGb: 18
+                    name: Apple M3 Pro
+                    pcpuCores: 5
+                    ramTotalBytes: "19327352832"
+                    swapTotalBytes: "11811160064"
+                codePath: training/train_serverless_rl.py
+                codePathLocal: training/train_serverless_rl.py
+                cpu_count: 11
+                cpu_count_logical: 11
+                disk:
+                    /:
+                        total: "494384795648"
+                        used: "408789774336"
+                email: ruchidattab@gmail.com
+                executable: /Users/ruchibommaraju/Northwestern/weavehacks2/.venv/bin/python
+                git:
+                    commit: 9777211ce2bf00837cb054a9b483d149bb39434a
+                    remote: https://github.com/imruchi/weavehacks2.git
+                host: Ruchis-MacBook-Pro.local
+                memory:
+                    total: "19327352832"
+                os: macOS-15.5-arm64-arm-64bit
+                program: /Users/ruchibommaraju/Northwestern/weavehacks2/training/train_serverless_rl.py
+                python: CPython 3.12.7
+                root: /Users/ruchibommaraju/Northwestern/weavehacks2
+                startedAt: "2025-10-12T14:46:06.588154Z"
+                writerId: mlrbq67prdgj0nvcc8xk15oglkrtvaxb
+        m: []
+        python_version: 3.12.7
+        t:
+            "1":
+                - 86
+                - 105
+            "2":
+                - 86
+                - 95
+                - 105
+            "3":
+                - 13
+            "4": 3.12.7
+            "5": 0.22.2
+            "10":
+                - 20
+            "12": 0.22.2
+            "13": darwin-arm64

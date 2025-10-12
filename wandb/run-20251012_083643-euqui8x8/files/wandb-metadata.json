@@ -1,0 +1,15 @@
+{
+  "os":  "macOS-15.5-arm64-arm-64bit",
+  "python":  "CPython 3.12.7",
+  "startedAt":  "2025-10-12T15:36:43.154002Z",
+  "program":  "<python with no main file>",
+  "git":  {
+    "remote":  "https://github.com/imruchi/weavehacks2.git",
+    "commit":  "9777211ce2bf00837cb054a9b483d149bb39434a"
+  },
+  "email":  "ruchidattab@gmail.com",
+  "root":  "/Users/ruchibommaraju/Northwestern/weavehacks2",
+  "host":  "Ruchis-MacBook-Pro.local",
+  "executable":  "/Users/ruchibommaraju/Northwestern/weavehacks2/.venv/bin/python",
+  "writerId":  "dj1esgxwf9c4crvlrvj3dxb8yjyc6upg"
+}

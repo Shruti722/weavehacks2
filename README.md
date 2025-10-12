@@ -179,6 +179,139 @@ WANDB_API_KEY=your_api_key_here
 WEAVE_PROJECT=synergi-grid-optimization
 ```
 
+---
+
+## Run on ServerlessRL (ART)
+
+**Fine-tune Qwen2.5-14B with PPO using OpenPipe's ServerlessRL (ART)**
+
+### Prerequisites
+
+1. **OpenPipe Account**: Sign up at [openpipe.ai](https://openpipe.ai)
+2. **API Keys**: Get keys from:
+   - OpenPipe: [app.openpipe.ai/settings](https://app.openpipe.ai/settings)
+   - W&B: [wandb.ai/authorize](https://wandb.ai/authorize)
+
+### Environment Setup
+
+Configure environment variables in `.env`:
+
+```bash
+# Required
+OPENPIPE_API_KEY=op-xxxxxxxx
+WANDB_API_KEY=xxxxxxxx
+WANDB_PROJECT=synergi-grid-optimization
+WEAVE_PROJECT=your-username/synergi-grid
+
+# Training config
+BASE_MODEL=qwen2.5-14b           # Model: qwen2.5-14b, qwen2.5-7b, qwen2-72b
+HORIZON=12                        # Episode length (12 steps = 1 hour)
+
+# Optional
+DATASET_REF=weave-traces-ds:latest  # Pre-collected trajectories
+```
+
+### Install OpenPipe CLI
+
+```bash
+pip install openpipe
+openpipe login  # Follow prompts to authenticate
+```
+
+### Launch Training
+
+**Option 1: Quick start (bash script)**
+```bash
+./scripts/launch_art_training.sh
+```
+
+**Option 2: Direct CLI command**
+```bash
+# Run RL training with OpenPipe ServerlessRL (ART)
+openpipe art train \
+  --env training.train_serverless_rl:make_env \
+  --project weavehacks-grid \
+  --method ppo \
+  --episodes 300 \
+  --model qwen2.5-14b
+```
+
+**Optional flags:**
+```bash
+# Advanced tuning
+openpipe art train \
+  --env training.train_serverless_rl:make_env \
+  --project weavehacks-grid \
+  --method ppo \
+  --episodes 300 \
+  --model qwen2.5-14b \
+  --ppo-epochs 4 \
+  --batch-size 32 \
+  --learning-rate 3e-5 \
+  --lora-rank 64 \
+  --gamma 0.99 \
+  --clip-epsilon 0.2
+```
+
+**What happens:**
+- ART creates parallel environments and runs PPO training
+- `make_env()` loads W&B Artifact dataset (`weave-traces-ds:latest`) for seeding
+- Each `reset()` seeds initial context from random dataset row (or synthetic fallback)
+- Model calls route through OpenPipe's API (`https://api.openpipe.ai/v1`)
+- Policy samples with `TEMPERATURE` and `TOP_P` from env (ART can override for KL control)
+- LoRA checkpoints saved as W&B Artifacts (project: `WANDB_PROJECT`)
+- Weave logs all LLM traces (no separate W&B runs per episode)
+- Returns scalar `reward: float` from `step()` for PPO optimizer
+
+### Monitor Training
+
+**Weave Dashboard** (LLM traces):
+```bash
+https://wandb.ai/your-username/synergi-grid/weave
+```
+
+**W&B Dashboard** (training metrics):
+```bash
+https://wandb.ai/your-username/synergi-grid-optimization
+```
+
+**View live logs**:
+```bash
+openpipe art logs
+```
+
+### Use Fine-Tuned Model
+
+After training completes, use the fine-tuned checkpoint:
+
+```python
+from multi_agent_system import SynErgiMultiAgentSystem
+
+# Load fine-tuned model from W&B artifact
+mas = SynErgiMultiAgentSystem(
+    model_name="openpipe:ft-qwen2.5-14b-xxxxx"  # From ART output
+)
+```
+
+### Test Locally
+
+Test environment before submitting to ART:
+
+```bash
+python training/train_serverless_rl.py
+```
+
+This runs a single episode locally to verify setup.
+
+### Key Features
+
+- ✅ **No training loops**: ART handles reset()/step() orchestration
+- ✅ **Automatic PPO**: Hyperparameter tuning included
+- ✅ **LoRA fine-tuning**: Efficient 14B parameter model training
+- ✅ **W&B Artifacts**: Checkpoints saved automatically
+- ✅ **Weave tracing**: All LLM calls logged for debugging
+- ✅ **Fail-fast validation**: Missing env vars caught immediately
+
 ## Project Structure
 
 ```

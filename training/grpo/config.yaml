@@ -1,0 +1,20 @@
+# ART GRPO Training Configuration for SynErgi Multi-Agent System
+
+model:
+  name: "synergi-agent-v1"
+  project: "synergi-grid-optimization"
+  base_model: "Qwen/Qwen2.5-14B-Instruct"
+
+training:
+  groups_per_step: 2        # Number of scenarios per training step
+  num_epochs: 5             # Number of training epochs
+  rollouts_per_group: 4     # Rollouts per scenario (for GRPO comparison)
+  learning_rate: 1e-5       # Learning rate
+  max_steps: 50             # Maximum training steps
+
+data:
+  trajectory_dir: "artifacts/trajectories"
+  limit: 10                 # Number of scenarios to use (null for all)
+
+backend:
+  type: "serverless"        # Use ART serverless backend

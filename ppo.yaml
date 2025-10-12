@@ -1,0 +1,52 @@
+# Algorithm
+algo: ppo
+seed: 42
+
+# Models (OpenAI-compatible endpoint via OPENAI_BASE_URL)
+policy_model: ${POLICY_MODEL_NAME}
+ref_model: ${REF_MODEL_NAME}
+
+# Rollout / generation
+rollout:
+  batch_size: 32           # prompts per PPO step
+  max_prompt_tokens: 512
+  max_gen_tokens: 256
+  temperature: 0.7
+  top_p: 0.9
+
+# Optimization
+train:
+  total_updates: 1500      # total PPO steps
+  minibatch_size: 8
+  epochs_per_update: 2
+  learning_rate: 5.0e-6
+  kl_target: 0.06          # target KL (stability knob)
+  cliprange: 0.2
+  gamma: 1.0
+  lam: 0.95
+
+# Logging
+logging:
+  wandb_project: ${WANDB_PROJECT}
+  log_every: 10
+  eval_every: 100
+
+# Data
+data:
+  path: ./data/traces.jsonl
+  prompt_key: prompt
+  reference_key: reference_response
+
+# Rewards (pick ONE approach below)
+
+# 1) Heuristic reward (string match/ROUGE/BLEU/etc.)
+reward:
+  type: "heuristic"
+  fn: "reference_similarity"  # implement below in your script
+  scale: 1.0
+
+# 2) Or external callback (HTTP) to your simulator / scorer
+# reward:
+#   type: "http"
+#   url: "http://localhost:7999/reward"   # implement a POST /reward that returns {"reward": float}
+#   timeout_s: 30

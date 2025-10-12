@@ -28,8 +28,8 @@ from agents.tools import (
 
 load_dotenv()
 
-# Initialize Weave for tracing
-weave.init(os.getenv("WEAVE_PROJECT", "synergi-grid-optimization"))
+# Initialize Weave for tracing - changed to synergi-rl-training for RL experiments
+weave.init(os.getenv("WEAVE_PROJECT", "synergi-rl-training"))
 
 
 # Define the shared state for all agents
@@ -175,25 +175,58 @@ class SynErgiMultiAgentSystem:
             self.grid_simulator = None
         self.graph = self._build_graph()
 
-    def _create_llm_with_tools(self, tools):
-        """Create LLM instance with tools bound"""
+    def _create_llm_with_tools(self, tools, temperature: float = None, top_p: float = None):
+        """
+        Create LLM instance with tools bound
+        Routes through OpenAI-compatible endpoints (OpenPipe or W&B)
+
+        Args:
+            tools: LangChain tools to bind
+            temperature: Sampling temperature (default from env or 0.3)
+            top_p: Nucleus sampling parameter (default from env or 0.9)
+        """
         from langchain_openai import ChatOpenAI
 
-        # Use W&B Inference API (OpenAI-compatible)
-        api_key = os.getenv("WANDB_API_KEY")
-        if not api_key:
-            raise ValueError(
-                "WANDB_API_KEY not found. Get it from https://wandb.ai/authorize"
-            )
+        # Priority: OpenPipe (for RL training) > W&B (for inference)
+        openpipe_key = os.getenv("OPENPIPE_API_KEY")
+        wandb_key = os.getenv("WANDB_API_KEY")
 
-        llm = ChatOpenAI(
-            model=self.model_name,
-            api_key=api_key,
-            base_url="https://api.inference.wandb.ai/v1",  # Correct W&B Inference endpoint
-            temperature=0.3,  # Lower temp for reasoning
-            max_tokens=4096,  # Detailed responses
-            request_timeout=120  # Timeout for inference
-        )
+        # Allow ART to control sampling params via env
+        if temperature is None:
+            temperature = float(os.getenv("TEMPERATURE", "0.3"))
+        if top_p is None:
+            top_p = float(os.getenv("TOP_P", "0.9"))
+
+        if openpipe_key and self.model_name.startswith("openpipe:"):
+            # OpenPipe for RL training - routes model calls through their endpoint
+            print(f"[LLM] Using OpenPipe: {self.model_name}")
+            print(f"      Temperature: {temperature}, Top-p: {top_p}")
+            llm = ChatOpenAI(
+                model=self.model_name,
+                api_key=openpipe_key,
+                base_url="https://api.openpipe.ai/v1",
+                temperature=temperature,
+                top_p=top_p,
+                max_tokens=4096,
+                request_timeout=120
+            )
+        elif wandb_key:
+            # W&B Inference for base models (non-RL)
+            print(f"[LLM] Using W&B Inference: {self.model_name}")
+            llm = ChatOpenAI(
+                model=self.model_name,
+                api_key=wandb_key,
+                base_url="https://api.inference.wandb.ai/v1",
+                temperature=temperature,
+                max_tokens=4096,
+                request_timeout=120
+            )
+        else:
+            raise ValueError(
+                "Missing API key! Set one of:\n"
+                "  OPENPIPE_API_KEY - for RL training (https://app.openpipe.ai/settings)\n"
+                "  WANDB_API_KEY - for inference (https://wandb.ai/authorize)"
+            )
 
         return llm.bind_tools(tools)
 

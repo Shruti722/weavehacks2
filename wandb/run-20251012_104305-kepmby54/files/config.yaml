@@ -1,0 +1,88 @@
+_wandb:
+    value:
+        cli_version: 0.22.2
+        e:
+            lr93hilpveqkncro5ti9vwk3lx47byi2:
+                apple:
+                    ecpuCores: 6
+                    gpuCores: 14
+                    memoryGb: 18
+                    name: Apple M3 Pro
+                    pcpuCores: 5
+                    ramTotalBytes: "19327352832"
+                    swapTotalBytes: "11811160064"
+                codePath: train_ppo.py
+                codePathLocal: train_ppo.py
+                cpu_count: 11
+                cpu_count_logical: 11
+                disk:
+                    /:
+                        total: "494384795648"
+                        used: "410319306752"
+                email: ruchidattab@gmail.com
+                executable: /Users/ruchibommaraju/Northwestern/weavehacks2/.venv/bin/python
+                git:
+                    commit: 9777211ce2bf00837cb054a9b483d149bb39434a
+                    remote: https://github.com/imruchi/weavehacks2.git
+                host: Ruchis-MacBook-Pro.local
+                memory:
+                    total: "19327352832"
+                os: macOS-15.5-arm64-arm-64bit
+                program: /Users/ruchibommaraju/Northwestern/weavehacks2/train_ppo.py
+                python: CPython 3.12.7
+                root: /Users/ruchibommaraju/Northwestern/weavehacks2
+                startedAt: "2025-10-12T17:43:05.568612Z"
+                writerId: lr93hilpveqkncro5ti9vwk3lx47byi2
+        m: []
+        python_version: 3.12.7
+        t:
+            "1":
+                - 105
+            "2":
+                - 105
+            "3":
+                - 16
+            "4": 3.12.7
+            "5": 0.22.2
+            "12": 0.22.2
+            "13": darwin-arm64
+algo:
+    value: ppo
+data:
+    value:
+        path: ./data/traces.jsonl
+        prompt_key: prompt
+        reference_key: reference_response
+logging:
+    value:
+        eval_every: 100
+        log_every: 10
+        wandb_project: synergi-rl-training
+policy_model:
+    value: ${POLICY_MODEL_NAME}
+ref_model:
+    value: ${REF_MODEL_NAME}
+reward:
+    value:
+        fn: reference_similarity
+        scale: 1
+        type: heuristic
+rollout:
+    value:
+        batch_size: 32
+        max_gen_tokens: 256
+        max_prompt_tokens: 512
+        temperature: 0.7
+        top_p: 0.9
+seed:
+    value: 42
+train:
+    value:
+        cliprange: 0.2
+        epochs_per_update: 2
+        gamma: 1
+        kl_target: 0.06
+        lam: 0.95
+        learning_rate: 5e-06
+        minibatch_size: 8
+        total_updates: 1500

@@ -543,7 +543,17 @@ class GridSimulator:
         1. Grid improvement (reduced deficit, risk, violations)
         2. Action costs (cheaper is better)
         3. Emissions (lower is better)
+        4. Penalty for taking no action when action is needed
         """
+        # Check if no actions were taken - apply penalty if deficit exists
+        no_action_penalty = 0.0
+        if len(actions_taken) == 0:
+            kpis_before = grid_state_before.get("kpis", {})
+            deficit_before = kpis_before.get("city_demand_mw", 0) - kpis_before.get("city_supply_mw", 0)
+            # If there's a deficit > 1 MW but no action taken, apply penalty
+            if deficit_before > 1.0:
+                no_action_penalty = 0.3  # 30% raw score penalty
+
         # Calculate costs for all actions
         total_cost = 0.0
         total_emissions = 0.0
@@ -588,21 +598,32 @@ class GridSimulator:
         # Calculate normalized reward components (each 0-1 scale)
 
         # 1. Deficit reduction (0 to 1, where 1 = eliminated all deficit)
-        max_deficit = 100.0  # Assume max deficit is 100 MW
-        deficit_score = max(0, min(1, deficit_improvement / max_deficit)) if deficit_before > 0 else 0.5
+        # More sensitive: use percentage reduction instead of absolute
+        if deficit_before > 0:
+            deficit_reduction_pct = deficit_improvement / deficit_before
+            deficit_score = max(0, min(1, deficit_reduction_pct))  # 0-100% reduction
+        else:
+            deficit_score = 1.0  # Perfect if no deficit to begin with
 
         # 2. Risk reduction (0 to 1, where 1 = eliminated all risk)
-        risk_score = max(0, min(1, risk_improvement / 1.0)) if risk_before > 0 else 0.5
+        # More sensitive: use percentage reduction
+        if risk_before > 0.01:  # If there was meaningful risk
+            risk_reduction_pct = risk_improvement / risk_before
+            risk_score = max(0, min(1, risk_reduction_pct * 2))  # 50% reduction = 1.0 score
+        else:
+            risk_score = 0.8  # Good baseline if risk was already low
 
         # 3. Cost efficiency (0 to 1, where 1 = no cost, 0 = very expensive)
-        max_cost = 1000.0  # Assume max action cost is $1000
-        cost_score = max(0, 1 - (total_cost / max_cost))
+        # More sensitive: quadratic penalty (makes cost differences more impactful)
+        normalized_cost = total_cost / 2000.0  # Normalize to 0-1 (assuming max $2000)
+        cost_score = max(0, min(1, (1 - normalized_cost) ** 2))  # Quadratic: better scores for low costs
 
         # 4. Fairness improvement (0 to 1)
-        fairness_score = max(0, min(1, 0.5 + fairness_improvement)) if fairness_before > 0 else 0.5
+        # More sensitive: wider range
+        fairness_score = max(0, min(1, 0.5 + fairness_improvement * 2)) if fairness_before > 0 else 0.5
 
         # 5. Violations penalty (0 to 1, where 1 = no violations)
-        violation_score = 1.0 if violations_after == 0 else max(0, 1 - violations_after / 10.0)
+        violation_score = 1.0 if violations_after == 0 else max(0, 1 - violations_after / 5.0)  # Harsher penalty
 
         # Weighted average (normalized to 0-1) - this is the "raw score"
         raw_score = (
@@ -616,11 +637,11 @@ class GridSimulator:
         # Ensure raw score is bounded [0, 1]
         raw_score = max(0.0, min(1.0, raw_score))
 
-        # BINARY REWARD: Apply 0.7 threshold for RL training
-        # If raw_score >= 0.7 → reward = 1 (success)
-        # If raw_score < 0.7  → reward = 0 (failure)
-        THRESHOLD = 0.7
-        reward = 1.0 if raw_score >= THRESHOLD else 0.0
+        # SHAPED REWARD: Use raw score directly for PPO training
+        # This provides gradient signal even for sub-optimal actions
+        # Raw score is already bounded [0, 1] and combines all objectives
+        THRESHOLD = 0.7  # Keep for logging/analysis
+        reward = raw_score  # Use continuous reward for RL
 
         # Track cumulative metrics
         self.cumulative_cost += total_cost

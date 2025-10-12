@@ -69,6 +69,28 @@ def test_multi_agent_workflow(user_prompt: str = None):
         print("📊 RESULTS")
         print("=" * 70)
 
+        # Show initial vs final grid state
+        initial_kpis = grid_state.get("kpis", {})
+        final_grid = result.get("grid_state", {})
+        final_kpis = final_grid.get("kpis", {})
+
+        print("\n⚡ GRID STATE COMPARISON:")
+        print("-" * 70)
+        print(f"{'Metric':<30} {'Before':<15} {'After':<15} {'Change':<15}")
+        print("-" * 70)
+
+        demand_before = initial_kpis.get('city_demand_mw', 0)
+        demand_after = final_kpis.get('city_demand_mw', 0)
+        supply_before = initial_kpis.get('city_supply_mw', 0)
+        supply_after = final_kpis.get('city_supply_mw', 0)
+        deficit_before = demand_before - supply_before
+        deficit_after = demand_after - supply_after
+
+        print(f"{'Total Demand (MW)':<30} {demand_before:<15.1f} {demand_after:<15.1f} {demand_after - demand_before:+.1f}")
+        print(f"{'Total Supply (MW)':<30} {supply_before:<15.1f} {supply_after:<15.1f} {supply_after - supply_before:+.1f}")
+        print(f"{'Deficit (MW)':<30} {deficit_before:<15.1f} {deficit_after:<15.1f} {deficit_after - deficit_before:+.1f}")
+        print(f"{'Avg Risk':<30} {initial_kpis.get('avg_overload_risk', 0):<15.3f} {final_kpis.get('avg_overload_risk', 0):<15.3f} {final_kpis.get('avg_overload_risk', 0) - initial_kpis.get('avg_overload_risk', 0):+.3f}")
+
         # Analyst output
         analyst_output = result.get("analyst_output", {})
         print("\n🔍 ANALYST ANALYSIS:")

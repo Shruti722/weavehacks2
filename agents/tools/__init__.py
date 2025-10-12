@@ -1,24 +1,66 @@
 """
-Agent Tools Module
-Defines callable tools for each agent
+Agent Tools Module - ALL ENHANCED FOR DEEP REASONING
+Defines callable tools for each agent with strategic insights
 """
 
-from .analyst_tools import load_forecast, risk_scan, anomaly_detection
-from .planner_tools import simulate_plan, cost_risk_analysis, policy_vault
-from .actuator_tools import charge_battery, discharge_battery, reconfigure_lines, update_grid_twin
+from .analyst_tools import (
+    # Enhanced reasoning tools
+    identify_spatial_clusters,
+    analyze_storage_strategy,
+    compare_to_baseline,
+    assess_cascading_failure_risk,
+    # Legacy tools
+    load_forecast,
+    risk_scan,
+    anomaly_detection
+)
+from .planner_tools import (
+    # Enhanced strategic tools
+    evaluate_tradeoffs,
+    assess_plan_feasibility,
+    prioritize_by_impact,
+    # Legacy tools
+    simulate_plan,
+    cost_risk_analysis,
+    policy_vault
+)
+from .actuator_tools import (
+    # Enhanced execution tools
+    validate_execution_sequence,
+    estimate_execution_time,
+    identify_execution_risks,
+    # Legacy tools
+    charge_battery,
+    discharge_battery,
+    reconfigure_lines,
+    update_grid_twin
+)
 
 __all__ = [
-    # Analyst tools
+    # Analyst tools - Enhanced
+    "identify_spatial_clusters",
+    "analyze_storage_strategy",
+    "compare_to_baseline",
+    "assess_cascading_failure_risk",
+    # Analyst tools - Legacy
     "load_forecast",
     "risk_scan",
     "anomaly_detection",
 
-    # Planner tools
+    # Planner tools - Enhanced
+    "evaluate_tradeoffs",
+    "assess_plan_feasibility",
+    "prioritize_by_impact",
+    # Planner tools - Legacy
     "simulate_plan",
     "cost_risk_analysis",
     "policy_vault",
 
-    # Actuator tools
+    # Actuator tools - Enhanced
+    "validate_execution_sequence",
+    "estimate_execution_time",
+    "identify_execution_risks",
+    # Actuator tools - Legacy
     "charge_battery",
     "discharge_battery",
     "reconfigure_lines",

@@ -1,6 +1,6 @@
 """
-PlannerAgent Tools
-Tools for simulating plans, analyzing cost/risk, and retrieving past policies
+PlannerAgent Tools - Enhanced for Strategic Reasoning
+Tools that help Planner make SMART tradeoff decisions
 """
 
 import json
@@ -11,6 +11,200 @@ from datetime import datetime
 
 # Mock policy database (in production, this would be a real database)
 POLICY_VAULT_DB = []
+
+
+def evaluate_tradeoffs(analyst_recommendations: List[Dict], constraints: Dict) -> Dict:
+    """
+    Help Planner evaluate tradeoffs between competing objectives.
+    Should we help many nodes a little, or few nodes a lot?
+
+    Returns strategic insights about allocation strategies.
+    """
+    total_deficit = sum(r.get("deficit_mw", 0) for r in analyst_recommendations)
+    node_count = len(analyst_recommendations)
+
+    # Get constraints
+    available_storage_mw = constraints.get("available_storage_mw", 50)
+    max_demand_response_mw = constraints.get("max_demand_response_mw", 20)
+    equity_weight = constraints.get("equity_weight", 0.5)  # 0-1, higher = prioritize equity zones
+
+    # Strategy 1: Focus on worst nodes
+    worst_nodes = sorted(analyst_recommendations, key=lambda x: x.get("deficit_mw", 0), reverse=True)[:3]
+    focused_deficit_coverage = sum(n.get("deficit_mw", 0) for n in worst_nodes)
+    focused_nodes_helped = len([n for n in worst_nodes if n.get("deficit_mw", 0) <= available_storage_mw / 3])
+
+    # Strategy 2: Spread across many nodes
+    spread_allocation = available_storage_mw / node_count
+    spread_nodes_helped = len([n for n in analyst_recommendations if n.get("deficit_mw", 0) <= spread_allocation * 1.5])
+
+    # Strategy 3: Equity-weighted (prioritize disadvantaged zones)
+    equity_nodes = [n for n in analyst_recommendations if n.get("equity_zone", False)]
+    equity_deficit = sum(n.get("deficit_mw", 0) for n in equity_nodes)
+
+    return {
+        "total_deficit_mw": round(total_deficit, 1),
+        "available_resources_mw": round(available_storage_mw + max_demand_response_mw, 1),
+        "can_solve_fully": available_storage_mw >= total_deficit,
+        "strategies": {
+            "focused": {
+                "description": f"Target 3 worst nodes with all resources",
+                "nodes_fully_helped": focused_nodes_helped,
+                "deficit_covered_pct": round(focused_deficit_coverage / total_deficit * 100, 1) if total_deficit > 0 else 0,
+                "pros": "Eliminates critical risks quickly",
+                "cons": "Leaves other nodes struggling"
+            },
+            "spread": {
+                "description": f"Distribute {spread_allocation:.1f} MW to each of {node_count} nodes",
+                "nodes_helped": spread_nodes_helped,
+                "deficit_covered_pct": round(min(100, (available_storage_mw / total_deficit) * 100), 1) if total_deficit > 0 else 0,
+                "pros": "Fair distribution, reduces system-wide risk",
+                "cons": "May not fully solve any single node"
+            },
+            "equity_first": {
+                "description": f"Prioritize {len(equity_nodes)} equity zones first",
+                "equity_nodes_count": len(equity_nodes),
+                "equity_deficit_mw": round(equity_deficit, 1),
+                "can_cover_equity": available_storage_mw >= equity_deficit,
+                "pros": "Protects disadvantaged communities",
+                "cons": "May leave commercial zones with deficits"
+            }
+        },
+        "recommendation": (
+            "FOCUSED" if available_storage_mw < total_deficit * 0.3 and focused_nodes_helped >= 2
+            else "EQUITY_FIRST" if equity_weight > 0.6 and len(equity_nodes) > 0
+            else "SPREAD"
+        ),
+        "strategic_insight": (
+            f"With {available_storage_mw:.0f} MW available and {total_deficit:.0f} MW deficit, you can't solve everything. "
+            f"FOCUSED strategy solves {focused_nodes_helped} critical nodes completely. "
+            f"SPREAD helps {spread_nodes_helped}/{node_count} nodes partially. "
+            f"Choose based on: Is preventing cascading failure (focused) or ensuring equity (spread) more important?"
+        )
+    }
+
+
+def assess_plan_feasibility(planned_actions: List[Dict], grid_state: Dict) -> Dict:
+    """
+    Check if a plan is actually feasible given storage levels, ramp rates, etc.
+    Prevents Planner from creating impossible plans.
+    """
+    nodes = grid_state.get("nodes", {})
+    feasibility_issues = []
+    warnings = []
+
+    total_discharge_planned = 0
+    total_charge_planned = 0
+
+    for action in planned_actions:
+        node_id = action.get("node_id")
+        action_type = action.get("action_type")
+        target_mw = action.get("target_mw", 0)
+
+        if node_id not in nodes:
+            feasibility_issues.append(f"Node '{node_id}' does not exist in grid")
+            continue
+
+        node = nodes[node_id]
+        soc = node.get("storage", {}).get("soc", 0)
+        capacity_mwh = node.get("storage", {}).get("energy_mwh_cap", 50)
+
+        if "discharge" in action_type.lower():
+            total_discharge_planned += target_mw
+
+            # Check if enough storage
+            available_energy = soc * capacity_mwh
+            required_energy = target_mw * (5/60)  # 5-min interval
+
+            if required_energy > available_energy:
+                feasibility_issues.append(
+                    f"{node_id}: Cannot discharge {target_mw} MW. Only {available_energy:.1f} MWh available (SOC={soc:.1%})"
+                )
+            elif soc < 0.2:
+                warnings.append(
+                    f"{node_id}: SOC is low ({soc:.1%}). Discharging will deplete storage further."
+                )
+
+        elif "charge" in action_type.lower():
+            total_charge_planned += target_mw
+
+            if soc > 0.9:
+                warnings.append(
+                    f"{node_id}: Already at {soc:.1%} SOC. Charging may not be necessary."
+                )
+
+        # Check ramp rate limits (10 MW/min typical)
+        if target_mw > 10:
+            warnings.append(
+                f"{node_id}: {target_mw} MW exceeds typical ramp rate limit of 10 MW"
+            )
+
+    return {
+        "is_feasible": len(feasibility_issues) == 0,
+        "feasibility_issues": feasibility_issues,
+        "warnings": warnings,
+        "total_discharge_mw": round(total_discharge_planned, 1),
+        "total_charge_mw": round(total_charge_planned, 1),
+        "actions_count": len(planned_actions),
+        "insight": (
+            f"✓ Plan is FEASIBLE. {len(planned_actions)} actions can be executed."
+            if len(feasibility_issues) == 0
+            else f"✗ Plan has {len(feasibility_issues)} BLOCKING issues. Revise plan: {'; '.join(feasibility_issues[:2])}"
+        )
+    }
+
+
+def prioritize_by_impact(nodes_data: List[Dict], criterion: str = "deficit") -> Dict:
+    """
+    Rank nodes by impact - helps Planner decide which nodes to target first.
+
+    Criteria:
+    - deficit: Nodes with biggest supply-demand gap
+    - risk: Nodes at highest risk of failure
+    - cascading: Nodes that could trigger cascading failures
+    - equity: Nodes in disadvantaged communities
+    """
+    if criterion == "deficit":
+        ranked = sorted(nodes_data, key=lambda x: x.get("deficit_mw", 0), reverse=True)
+        metric = "deficit_mw"
+
+    elif criterion == "risk":
+        ranked = sorted(nodes_data, key=lambda x: x.get("risk_score", 0), reverse=True)
+        metric = "risk_score"
+
+    elif criterion == "cascading":
+        # Prioritize nodes with many connections (hubs)
+        ranked = sorted(nodes_data, key=lambda x: x.get("connection_count", 0), reverse=True)
+        metric = "connection_count"
+
+    elif criterion == "equity":
+        # Prioritize equity zones, then by deficit within them
+        ranked = sorted(nodes_data, key=lambda x: (x.get("equity_zone", False), x.get("deficit_mw", 0)), reverse=True)
+        metric = "equity_weighted"
+
+    else:
+        ranked = nodes_data
+        metric = "unknown"
+
+    top_5 = ranked[:5]
+
+    return {
+        "criterion": criterion,
+        "total_nodes": len(nodes_data),
+        "top_5_priorities": [
+            {
+                "rank": i+1,
+                "node_id": n.get("node_id"),
+                "metric_value": n.get(metric, n.get("deficit_mw", 0)),
+                "is_equity_zone": n.get("equity_zone", False)
+            }
+            for i, n in enumerate(top_5)
+        ],
+        "insight": (
+            f"By {criterion.upper()} criterion, target these 5 nodes first: "
+            f"{', '.join([n.get('node_id', 'unknown') for n in top_5[:3]])}. "
+            f"Helping these will have maximum impact."
+        )
+    }
 
 
 def simulate_plan(current_state: Dict, planned_actions: List[Dict]) -> Dict:

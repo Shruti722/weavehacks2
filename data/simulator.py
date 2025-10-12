@@ -1,6 +1,11 @@
 """
-Real-time Grid Data Simulator
-Generates realistic time-series data for SF power grid with smooth 5-minute updates
+Real-time Grid Data Simulator - ENHANCED FOR RL
+Generates realistic time-series data for SF power grid with:
+- Transmission line constraints and power flow
+- Renewable generation variability (solar/wind)
+- Generator types with different costs and ramp rates
+- Battery degradation
+- Multi-objective cost function
 """
 
 import json
@@ -48,6 +53,17 @@ class GridSimulator:
 
         # Initialize baseline values from neighborhoods
         self._initialize_baselines()
+
+        # RL-READY ENHANCEMENTS
+        self._initialize_generators()
+        self._initialize_renewables()
+        self._initialize_transmission_constraints()
+        self._initialize_battery_degradation()
+
+        # Track accumulated costs and emissions for episode
+        self.cumulative_cost = 0.0
+        self.cumulative_emissions = 0.0
+        self.cumulative_unserved_energy = 0.0
 
     def _load_template(self):
         """Load the template JSON file"""
@@ -120,6 +136,90 @@ class GridSimulator:
             "yosemite_slopes": {"demand": 18.0, "supply": 19.0, "type": "residential"},
             "treasure_island": {"demand": 15.0, "supply": 18.0, "type": "mixed"},
         }
+
+    def _initialize_generators(self):
+        """Initialize generator types with different costs and characteristics"""
+        self.generators = {
+            "gas_peaker": {
+                "marginal_cost_usd_per_mwh": 180.0,  # Expensive but fast
+                "ramp_rate_mw_per_min": 10.0,
+                "min_output_mw": 5.0,
+                "max_output_mw": 50.0,
+                "startup_cost_usd": 500.0,
+                "emissions_kg_co2_per_mwh": 600.0,
+                "count": 5  # 5 peaker plants across SF
+            },
+            "gas_combined_cycle": {
+                "marginal_cost_usd_per_mwh": 60.0,  # Cheaper, slower
+                "ramp_rate_mw_per_min": 2.0,
+                "min_output_mw": 20.0,
+                "max_output_mw": 150.0,
+                "startup_cost_usd": 1500.0,
+                "emissions_kg_co2_per_mwh": 400.0,
+                "count": 2  # 2 large CC plants
+            },
+            "battery_discharge": {
+                "marginal_cost_usd_per_mwh": 20.0,  # Cheap but limited by SOC
+                "ramp_rate_mw_per_min": 50.0,  # Very fast
+                "degradation_cost_usd_per_mwh": 15.0,  # Battery wear cost
+                "efficiency": 0.95,
+                "emissions_kg_co2_per_mwh": 0.0
+            }
+        }
+
+    def _initialize_renewables(self):
+        """Initialize renewable generation with variability"""
+        # Track renewable capacity by zone
+        self.renewable_capacity = {
+            # Solar-rich western neighborhoods
+            "outer_sunset": {"solar_mw": 12.0, "wind_mw": 0.0},
+            "outer_richmond": {"solar_mw": 10.0, "wind_mw": 0.0},
+            "inner_sunset": {"solar_mw": 10.0, "wind_mw": 0.0},
+            "inner_richmond": {"solar_mw": 10.0, "wind_mw": 0.0},
+            "parkside": {"solar_mw": 8.0, "wind_mw": 0.0},
+
+            # Wind potential near coast/bay
+            "treasure_island": {"solar_mw": 2.0, "wind_mw": 8.0},
+            "presidio": {"solar_mw": 5.0, "wind_mw": 5.0},
+            "golden_gate_park": {"solar_mw": 3.0, "wind_mw": 4.0},
+        }
+
+        # Forecast error parameters (mean=0, std=20% of capacity)
+        self.renewable_forecast_error = 0.2
+
+    def _initialize_transmission_constraints(self):
+        """Initialize transmission line capacity limits"""
+        # Main transmission corridors in SF
+        self.transmission_lines = {
+            # North-South backbone (high capacity)
+            "financial_district|mission_bay": {"capacity_mw": 80.0, "reactance": 0.05},
+            "mission_bay|potrero_hill": {"capacity_mw": 70.0, "reactance": 0.06},
+
+            # East-West corridors (medium capacity)
+            "financial_district|russian_hill": {"capacity_mw": 60.0, "reactance": 0.04},
+            "mission|castro": {"capacity_mw": 55.0, "reactance": 0.05},
+            "inner_sunset|haight_ashbury": {"capacity_mw": 50.0, "reactance": 0.06},
+
+            # Local feeders (lower capacity - bottleneck potential!)
+            "tenderloin|civic_center": {"capacity_mw": 35.0, "reactance": 0.08},
+            "chinatown|north_beach": {"capacity_mw": 40.0, "reactance": 0.07},
+            "outer_richmond|seacliff": {"capacity_mw": 30.0, "reactance": 0.09},
+        }
+
+        # Voltage limits (per-unit)
+        self.voltage_min = 0.95
+        self.voltage_max = 1.05
+
+    def _initialize_battery_degradation(self):
+        """Track battery health and degradation"""
+        self.battery_health = {}  # SOH (state of health) per node
+        for node_id in self.baselines.keys():
+            self.battery_health[node_id] = {
+                "soh_percent": 100.0,  # Starts at 100%
+                "cycle_count": 0,
+                "throughput_mwh": 0.0,
+                "degradation_rate_per_cycle": 0.02  # Loses 0.02% per full cycle
+            }
 
     def _get_hour_factor(self, hour, node_type):
         """Get demand multiplier based on time of day and node type"""
@@ -232,6 +332,94 @@ class GridSimulator:
             "rt_usd_per_kwh": round(rt_price, 3)
         }
 
+    def _calculate_renewable_output(self, node_id):
+        """Calculate actual renewable generation with forecast error"""
+        if node_id not in self.renewable_capacity:
+            return 0.0
+
+        capacity = self.renewable_capacity[node_id]
+
+        # Solar output (depends on irradiance)
+        solar_cf = self.prev_solar / 1000.0  # Capacity factor 0-1
+        solar_forecast_error = random.gauss(0, self.renewable_forecast_error)
+        solar_output = capacity["solar_mw"] * solar_cf * (1 + solar_forecast_error)
+        solar_output = max(0, min(capacity["solar_mw"], solar_output))
+
+        # Wind output (depends on wind speed, cubic relationship)
+        wind_cf = min(1.0, (self.prev_wind / 12.0) ** 3)  # Cut-in to rated
+        wind_forecast_error = random.gauss(0, self.renewable_forecast_error)
+        wind_output = capacity["wind_mw"] * wind_cf * (1 + wind_forecast_error)
+        wind_output = max(0, min(capacity["wind_mw"], wind_output))
+
+        return solar_output + wind_output
+
+    def _check_transmission_constraint(self, edge_id, flow_mw):
+        """Check if power flow violates transmission line capacity"""
+        if edge_id in self.transmission_lines:
+            capacity = self.transmission_lines[edge_id]["capacity_mw"]
+            loading = abs(flow_mw) / capacity if capacity > 0 else 0
+            is_violated = loading > 1.0
+            return {
+                "capacity_mw": capacity,
+                "flow_mw": flow_mw,
+                "loading_percent": round(loading * 100, 1),
+                "violated": is_violated,
+                "margin_mw": round(capacity - abs(flow_mw), 2)
+            }
+        return None
+
+    def calculate_action_cost(self, action_type, node_id, mw, duration_min=5):
+        """
+        Calculate cost of an action for RL reward function
+        Returns dict with cost breakdown
+        """
+        duration_hours = duration_min / 60.0
+        energy_mwh = mw * duration_hours
+
+        cost_breakdown = {
+            "generation_cost_usd": 0.0,
+            "battery_degradation_cost_usd": 0.0,
+            "startup_cost_usd": 0.0,
+            "emissions_kg_co2": 0.0,
+            "total_cost_usd": 0.0
+        }
+
+        if action_type == "increase_supply":
+            # Use gas peaker (expensive but fast)
+            gen = self.generators["gas_peaker"]
+            cost_breakdown["generation_cost_usd"] = energy_mwh * gen["marginal_cost_usd_per_mwh"]
+            cost_breakdown["emissions_kg_co2"] = energy_mwh * gen["emissions_kg_co2_per_mwh"]
+            if mw > gen["min_output_mw"]:
+                cost_breakdown["startup_cost_usd"] = gen["startup_cost_usd"]
+
+        elif action_type in ["discharge_storage", "discharge_battery"]:
+            # Battery discharge
+            gen = self.generators["battery_discharge"]
+            cost_breakdown["generation_cost_usd"] = energy_mwh * gen["marginal_cost_usd_per_mwh"]
+            cost_breakdown["battery_degradation_cost_usd"] = energy_mwh * gen["degradation_cost_usd_per_mwh"]
+
+            # Update battery health
+            if node_id in self.battery_health:
+                health = self.battery_health[node_id]
+                health["throughput_mwh"] += energy_mwh
+                # Assume 50 MWh capacity = 1 full cycle
+                cycles = energy_mwh / 50.0
+                health["cycle_count"] += cycles
+                health["soh_percent"] -= cycles * health["degradation_rate_per_cycle"]
+                health["soh_percent"] = max(50.0, health["soh_percent"])  # Floor at 50%
+
+        elif action_type == "reduce_demand":
+            # Demand response has cost (customer inconvenience)
+            cost_breakdown["generation_cost_usd"] = energy_mwh * 50.0  # $50/MWh incentive
+
+        cost_breakdown["total_cost_usd"] = (
+            cost_breakdown["generation_cost_usd"] +
+            cost_breakdown["battery_degradation_cost_usd"] +
+            cost_breakdown["startup_cost_usd"]
+        )
+
+        return cost_breakdown
+
     def _update_node(self, node_id, node_data):
         """Update dynamic fields for a single node"""
         # Get baseline or use default
@@ -249,13 +437,17 @@ class GridSimulator:
         new_demand = self._smooth_transition(prev_demand, target_demand, 0.25)
         self.prev_demands[node_id] = new_demand
 
-        # Supply tries to match demand with some lag and renewable variation
-        solar_bonus = self.prev_solar / 1000.0 * 5  # Solar adds up to 5 MW
-        target_supply = baseline["supply"] * hour_factor * random.uniform(0.93, 1.03) + solar_bonus
+        # Supply tries to match demand with renewable generation
+        renewable_output = self._calculate_renewable_output(node_id)
+        base_supply = baseline["supply"] * hour_factor * random.uniform(0.93, 1.03)
+        target_supply = base_supply + renewable_output
 
         prev_supply = self.prev_supplies.get(node_id, target_supply)
         new_supply = self._smooth_transition(prev_supply, target_supply, 0.25)
         self.prev_supplies[node_id] = new_supply
+
+        # Store renewable contribution for visibility
+        node_data["renewable_mw"] = round(renewable_output, 2)
 
         # Update dynamic fields
         node_data["demand_mw"] = round(new_demand, 2)
@@ -286,7 +478,7 @@ class GridSimulator:
         node_data["price_signal"] = round(imbalance_ratio * 2.0, 3)
 
     def _update_edges(self, edges, nodes):
-        """Update power flow on transmission lines"""
+        """Update power flow on transmission lines with constraint checking"""
         for edge_id, edge_data in edges.items():
             if not edge_data["active"]:
                 continue
@@ -302,9 +494,19 @@ class GridSimulator:
                 flow = (net_a - net_b) * random.uniform(0.3, 0.5)
                 edge_data["flow_mw"] = round(flow, 2)
 
-                capacity = edge_data.get("capacity_mw", 50.0)
-                if capacity > 0:
-                    edge_data["loading"] = round(abs(flow) / capacity, 3)
+                # Check transmission constraint
+                constraint_check = self._check_transmission_constraint(edge_id, flow)
+                if constraint_check:
+                    edge_data["capacity_mw"] = constraint_check["capacity_mw"]
+                    edge_data["loading"] = constraint_check["loading_percent"] / 100.0
+                    edge_data["constraint_violated"] = constraint_check["violated"]
+                    edge_data["margin_mw"] = constraint_check["margin_mw"]
+                else:
+                    # No constraint defined - use default
+                    capacity = edge_data.get("capacity_mw", 50.0)
+                    if capacity > 0:
+                        edge_data["loading"] = round(abs(flow) / capacity, 3)
+                        edge_data["constraint_violated"] = abs(flow) > capacity
 
     def _update_kpis(self, nodes):
         """Update city-wide KPIs"""
@@ -319,13 +521,122 @@ class GridSimulator:
         variance = sum((r - avg_ratio) ** 2 for r in supply_ratios) / len(supply_ratios)
         fairness = max(0, 1.0 - variance)
 
+        # Count renewable generation
+        total_renewable = sum(n.get("renewable_mw", 0) for n in nodes.values())
+
         return {
             "city_demand_mw": round(total_demand, 2),
             "city_supply_mw": round(total_supply, 2),
             "unserved_energy_proxy_mw": round(unserved, 2),
             "avg_overload_risk": round(avg_risk, 3),
             "total_curtailment_mw": 0.0,  # To be set by control actions
-            "fairness_index": round(fairness, 3)
+            "fairness_index": round(fairness, 3),
+            "total_renewable_mw": round(total_renewable, 2),
+            "renewable_penetration": round(total_renewable / total_supply * 100, 1) if total_supply > 0 else 0
+        }
+
+    def calculate_rl_reward(self, actions_taken, grid_state_before, grid_state_after):
+        """
+        Calculate RL reward for taken actions by comparing BEFORE vs AFTER
+        Reward is based on:
+        1. Grid improvement (reduced deficit, risk, violations)
+        2. Action costs (cheaper is better)
+        3. Emissions (lower is better)
+        """
+        # Calculate costs for all actions
+        total_cost = 0.0
+        total_emissions = 0.0
+
+        for action in actions_taken:
+            cost_data = self.calculate_action_cost(
+                action["action_type"],
+                action["node_id"],
+                action["target_mw"],
+                duration_min=5
+            )
+            total_cost += cost_data["total_cost_usd"]
+            total_emissions += cost_data["emissions_kg_co2"]
+
+        # Get BEFORE metrics
+        kpis_before = grid_state_before.get("kpis", {})
+        unserved_before = kpis_before.get("unserved_energy_proxy_mw", 0)
+        deficit_before = kpis_before.get("city_demand_mw", 0) - kpis_before.get("city_supply_mw", 0)
+        risk_before = kpis_before.get("avg_overload_risk", 0)
+        fairness_before = kpis_before.get("fairness_index", 0)
+
+        edges_before = grid_state_before.get("edges", {})
+        violations_before = sum(1 for e in edges_before.values() if e.get("constraint_violated", False))
+
+        # Get AFTER metrics
+        kpis_after = grid_state_after.get("kpis", {})
+        unserved_after = kpis_after.get("unserved_energy_proxy_mw", 0)
+        deficit_after = kpis_after.get("city_demand_mw", 0) - kpis_after.get("city_supply_mw", 0)
+        risk_after = kpis_after.get("avg_overload_risk", 0)
+        fairness_after = kpis_after.get("fairness_index", 0)
+
+        edges_after = grid_state_after.get("edges", {})
+        violations_after = sum(1 for e in edges_after.values() if e.get("constraint_violated", False))
+
+        # Calculate IMPROVEMENTS (positive = better)
+        deficit_improvement = deficit_before - deficit_after  # Reduced deficit is good
+        unserved_improvement = unserved_before - unserved_after  # Reduced unserved is good
+        risk_improvement = risk_before - risk_after  # Reduced risk is good
+        fairness_improvement = fairness_after - fairness_before  # Increased fairness is good
+        violations_improvement = violations_before - violations_after  # Fewer violations is good
+
+        # Multi-objective reward
+        reward = (
+            # IMPROVEMENTS (positive rewards for making things better)
+            +deficit_improvement * 10.0           # Big reward for reducing deficit
+            +unserved_improvement * 100.0         # Huge reward for serving more energy
+            +risk_improvement * 50.0              # Reward for reducing risk
+            +fairness_improvement * 20.0          # Reward for improving fairness
+            +violations_improvement * 100.0       # Huge reward for fixing violations
+
+            # COSTS (penalties for expensive/dirty actions)
+            -total_cost / 100.0                   # Penalty for cost (~$0-500 → -0 to -5)
+            -total_emissions / 100.0              # Penalty for emissions
+
+            # ABSOLUTE PENALTIES (still bad even if improved)
+            -unserved_after * 50.0                # Still penalize any remaining unserved energy
+            -violations_after * 50.0              # Still penalize any remaining violations
+        )
+
+        # Track cumulative metrics
+        self.cumulative_cost += total_cost
+        self.cumulative_emissions += total_emissions
+        self.cumulative_unserved_energy += unserved_after
+
+        return {
+            "reward": round(reward, 2),
+            "cost_usd": round(total_cost, 2),
+            "emissions_kg_co2": round(total_emissions, 2),
+
+            # BEFORE metrics
+            "deficit_before_mw": round(deficit_before, 2),
+            "unserved_before_mw": round(unserved_before, 2),
+            "risk_before": round(risk_before, 3),
+            "fairness_before": round(fairness_before, 3),
+            "violations_before": violations_before,
+
+            # AFTER metrics
+            "deficit_after_mw": round(deficit_after, 2),
+            "unserved_after_mw": round(unserved_after, 2),
+            "risk_after": round(risk_after, 3),
+            "fairness_after": round(fairness_after, 3),
+            "violations_after": violations_after,
+
+            # IMPROVEMENTS
+            "deficit_improvement_mw": round(deficit_improvement, 2),
+            "unserved_improvement_mw": round(unserved_improvement, 2),
+            "risk_improvement": round(risk_improvement, 3),
+            "fairness_improvement": round(fairness_improvement, 3),
+            "violations_improvement": violations_improvement,
+
+            # Cumulative
+            "cumulative_cost_usd": round(self.cumulative_cost, 2),
+            "cumulative_emissions_kg": round(self.cumulative_emissions, 2),
+            "cumulative_unserved_mwh": round(self.cumulative_unserved_energy, 2)
         }
 
     def generate_tick(self):
@@ -366,7 +677,7 @@ class GridSimulator:
             json.dump(data, f, indent=2)
 
     def reset(self, start_time=None):
-        """Reset simulator to initial state"""
+        """Reset simulator to initial state - for RL episode reset"""
         self.current_time = start_time or datetime.now()
         self.tick_count = 0
         self.prev_demands = {}
@@ -374,6 +685,20 @@ class GridSimulator:
         self.prev_temp = 18.0
         self.prev_solar = 0.0
         self.prev_wind = 3.0
+
+        # Reset cumulative RL metrics
+        self.cumulative_cost = 0.0
+        self.cumulative_emissions = 0.0
+        self.cumulative_unserved_energy = 0.0
+
+        # Reset battery health
+        for node_id in self.battery_health.keys():
+            self.battery_health[node_id] = {
+                "soh_percent": 100.0,
+                "cycle_count": 0,
+                "throughput_mwh": 0.0,
+                "degradation_rate_per_cycle": 0.02
+            }
 
 
 if __name__ == "__main__":

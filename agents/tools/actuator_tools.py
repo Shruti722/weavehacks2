@@ -1,9 +1,195 @@
 """
-ActuatorAgent Tools
-Tools for executing grid control actions
+ActuatorAgent Tools - Enhanced for Execution Wisdom
+Tools that help Actuator execute SAFELY and EFFICIENTLY
 """
 
 from typing import Dict, List
+
+
+def validate_execution_sequence(planned_actions: List[Dict], grid_state: Dict) -> Dict:
+    """
+    Determine the SAFEST execution order for actions.
+    Some actions must happen before others to avoid instability.
+
+    Returns optimal sequence with reasoning.
+    """
+    # Categorize actions by type
+    supply_increases = []
+    demand_reductions = []
+    storage_operations = []
+
+    for i, action in enumerate(planned_actions):
+        action_with_idx = {**action, "original_index": i}
+        action_type = action.get("action_type", "").lower()
+
+        if "increase_supply" in action_type or "discharge" in action_type:
+            supply_increases.append(action_with_idx)
+        elif "reduce_demand" in action_type:
+            demand_reductions.append(action_with_idx)
+        elif "charge" in action_type:
+            storage_operations.append(action_with_idx)
+        else:
+            supply_increases.append(action_with_idx)  # Default
+
+    # Optimal sequence:
+    # 1. Supply increases FIRST (fixes root cause)
+    # 2. Demand reductions SECOND (customer impact)
+    # 3. Storage operations LAST (balance)
+
+    optimal_sequence = supply_increases + demand_reductions + storage_operations
+
+    return {
+        "original_order_count": len(planned_actions),
+        "optimal_sequence": [
+            {
+                "execution_order": i+1,
+                "node_id": a.get("node_id"),
+                "action_type": a.get("action_type"),
+                "original_index": a.get("original_index")
+            }
+            for i, a in enumerate(optimal_sequence)
+        ],
+        "sequence_changed": optimal_sequence != planned_actions,
+        "insight": (
+            f"OPTIMAL SEQUENCE: Execute {len(supply_increases)} supply increases first (fixes deficit), "
+            f"then {len(demand_reductions)} demand reductions (minimizes customer impact), "
+            f"then {len(storage_operations)} storage operations (balancing). "
+            f"This prevents voltage dips and ensures stability."
+        ),
+        "safety_notes": [
+            "Supply increases should ramp gradually (0.5 MW/min)" if supply_increases else None,
+            "Coordinate demand response to avoid sudden drops" if demand_reductions else None,
+            "Monitor SOC after each discharge to prevent over-depletion" if storage_operations else None
+        ]
+    }
+
+
+def estimate_execution_time(actions: List[Dict]) -> Dict:
+    """
+    Calculate how long execution will take, including ramp times.
+    Helps Actuator set realistic expectations.
+    """
+    total_time_min = 0
+    action_timings = []
+
+    for action in actions:
+        action_type = action.get("action_type", "").lower()
+        target_mw = action.get("target_mw", 0)
+
+        # Ramp rates (MW/min)
+        if "discharge" in action_type or "increase_supply" in action_type:
+            ramp_rate = 0.5  # Conservative 0.5 MW/min
+            ramp_time = target_mw / ramp_rate
+            execution_time = ramp_time + 2  # +2 min for startup/stabilization
+
+        elif "reduce_demand" in action_type:
+            # Demand response: notification + implementation
+            execution_time = 5 + target_mw * 0.5  # 5 min base + scaling
+
+        elif "charge" in action_type:
+            ramp_rate = 0.3
+            execution_time = target_mw / ramp_rate + 1
+
+        else:
+            execution_time = 5  # Default
+
+        action_timings.append({
+            "node_id": action.get("node_id"),
+            "action_type": action_type,
+            "execution_time_min": round(execution_time, 1)
+        })
+
+        total_time_min += execution_time
+
+    # Can we parallelize?
+    max_parallel_actions = 3  # Grid can handle 3 simultaneous actions
+    if len(actions) > max_parallel_actions:
+        # Sequential batches
+        batches = (len(actions) + max_parallel_actions - 1) // max_parallel_actions
+        parallel_time = total_time_min / batches
+    else:
+        parallel_time = max([a["execution_time_min"] for a in action_timings]) if action_timings else 0
+
+    return {
+        "total_actions": len(actions),
+        "sequential_time_min": round(total_time_min, 1),
+        "parallel_time_min": round(parallel_time, 1),
+        "time_saved_min": round(total_time_min - parallel_time, 1),
+        "action_timings": action_timings,
+        "insight": (
+            f"SEQUENTIAL execution: {total_time_min:.1f} minutes total. "
+            f"PARALLEL execution (3 at a time): {parallel_time:.1f} minutes. "
+            f"Recommendation: Execute in parallel to save {total_time_min - parallel_time:.1f} minutes."
+        )
+    }
+
+
+def identify_execution_risks(actions: List[Dict], grid_state: Dict) -> Dict:
+    """
+    Identify potential risks BEFORE executing.
+    Prevents Actuator from causing cascading failures.
+    """
+    risks = []
+    warnings = []
+    nodes = grid_state.get("nodes", {})
+
+    # Risk 1: Over-depleting storage
+    nodes_with_low_soc = []
+    for action in actions:
+        if "discharge" in action.get("action_type", "").lower():
+            node_id = action.get("node_id")
+            if node_id in nodes:
+                soc = nodes[node_id].get("storage", {}).get("soc", 0)
+                if soc < 0.15:
+                    risks.append({
+                        "risk_type": "storage_depletion",
+                        "node_id": node_id,
+                        "current_soc": round(soc, 2),
+                        "severity": "HIGH",
+                        "description": f"Discharging at SOC={soc:.1%} will critically deplete storage. No backup for next hour."
+                    })
+                    nodes_with_low_soc.append(node_id)
+
+    # Risk 2: Simultaneous actions on connected nodes
+    nodes_affected = [a.get("node_id") for a in actions]
+    if len(set(nodes_affected)) < len(nodes_affected):
+        risks.append({
+            "risk_type": "duplicate_node_action",
+            "severity": "MEDIUM",
+            "description": "Multiple actions planned for same node. May cause oscillations."
+        })
+
+    # Risk 3: Large sudden changes
+    large_actions = [a for a in actions if a.get("target_mw", 0) > 10]
+    if large_actions:
+        warnings.append({
+            "warning_type": "large_change",
+            "count": len(large_actions),
+            "description": f"{len(large_actions)} actions exceed 10 MW. Ensure gradual ramp to avoid voltage transients."
+        })
+
+    # Risk 4: No backup plan
+    total_discharge = sum(a.get("target_mw", 0) for a in actions if "discharge" in a.get("action_type", "").lower())
+    if total_discharge > 50:
+        warnings.append({
+            "warning_type": "high_discharge",
+            "total_mw": round(total_discharge, 1),
+            "description": f"Total discharge of {total_discharge:.0f} MW is very high. Ensure generation backup is available."
+        })
+
+    return {
+        "total_risks": len(risks),
+        "total_warnings": len(warnings),
+        "risks": risks,
+        "warnings": warnings,
+        "execution_recommended": len([r for r in risks if r.get("severity") == "HIGH"]) == 0,
+        "insight": (
+            f"✓ SAFE TO EXECUTE: {len(warnings)} warnings but no blocking risks."
+            if len([r for r in risks if r.get("severity") == "HIGH"]) == 0
+            else f"⚠️ {len([r for r in risks if r.get('severity') == 'HIGH'])} HIGH-SEVERITY RISKS DETECTED. "
+                 f"Recommend revising plan before execution: {risks[0].get('description', '')}"
+        )
+    }
 
 
 def charge_battery(node_id: str, power_mw: float, duration_min: float = 5) -> Dict:

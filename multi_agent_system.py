@@ -15,8 +15,14 @@ from langchain_core.tools import tool
 
 # Import our custom tools
 from agents.tools import (
+    # Analyst tools - enhanced reasoning
+    identify_spatial_clusters, analyze_storage_strategy,
+    compare_to_baseline, assess_cascading_failure_risk,
+    # Analyst tools - legacy
     load_forecast, risk_scan, anomaly_detection,
+    # Planner tools
     simulate_plan, cost_risk_analysis, policy_vault,
+    # Actuator tools
     charge_battery, discharge_battery, reconfigure_lines, update_grid_twin
 )
 
@@ -112,6 +118,12 @@ def actuator_update_grid_twin(commands: list, current_state: dict) -> dict:
 
 # Agent tool assignments
 analyst_tools = [
+    # Enhanced reasoning tools (NEW - prioritized)
+    identify_spatial_clusters,
+    analyze_storage_strategy,
+    compare_to_baseline,
+    assess_cascading_failure_risk,
+    # Legacy tools
     query_grid_state,
     analyst_load_forecast,
     analyst_risk_scan,
@@ -147,7 +159,7 @@ class SynErgiMultiAgentSystem:
     7. ActuatorAgent → DigitalTwin (updates state)
     """
 
-    def __init__(self, model_name: str = "Qwen/Qwen2.5-14B-Instruct"):
+    def __init__(self, model_name: str = "Qwen/Qwen2.5-14B-Instruct", max_turns: int = 10):
         """
         Initialize multi-agent system with W&B Inference.
 
@@ -159,8 +171,23 @@ class SynErgiMultiAgentSystem:
         Other options:
         - meta-llama/Llama-3.1-8B-Instruct (8B, lighter)
         - microsoft/Phi-4-mini-instruct (3.8B, very lightweight)
+
+        Args:
+            max_turns: Maximum conversation turns before forcing end (prevents infinite loops)
         """
         self.model_name = model_name
+        self.max_turns = max_turns
+
+        # Initialize grid simulator for RL reward calculation
+        try:
+            import sys
+            sys.path.append('data')
+            from simulator import GridSimulator
+            self.grid_simulator = GridSimulator("data/data.json")
+            print("✓ Grid simulator initialized for RL reward calculation")
+        except Exception as e:
+            print(f"⚠️  Grid simulator not available: {e}")
+            self.grid_simulator = None
         self.graph = self._build_graph()
 
     def _create_llm_with_tools(self, tools):
@@ -208,53 +235,172 @@ State data ready for Analyst."""
 
     @weave.op()
     def analyst_node(self, state: AgentState) -> AgentState:
-        """Analyst Agent node - analyzes grid and responds to queries"""
+        """Analyst Agent node - analyzes grid and responds to queries WITH TOOL CALLING"""
         llm_with_tools = self._create_llm_with_tools(analyst_tools)
 
         grid_state = state.get("grid_state", {})
         messages = state.get("messages", [])
+        nodes = grid_state.get("nodes", {})
+        drivers = grid_state.get("drivers", {})
 
-        # System prompt for analyst
-        system_msg = SystemMessage(content="""You are the AnalystAgent.
-Your job:
-1. Analyze the grid state and provide insights WITHOUT using tools
-2. Identify critical issues, risks, and trends from the data provided
-3. Focus on: supply-demand imbalances, high-risk nodes, storage levels
-4. Provide concise, actionable analysis in natural language
+        # Check if Planner is asking a question
+        last_message = messages[-1] if messages else None
+        is_responding_to_planner = (
+            last_message and
+            hasattr(last_message, 'name') and
+            last_message.name == "Planner" and
+            "?" in last_message.content
+        )
 
-DO NOT call tools - just analyze the data given to you.""")
+        # System prompt for analyst WITH tool instructions
+        system_msg = SystemMessage(content="""You are the AnalystAgent - an expert grid analyst with powerful analysis tools.
 
-        # Add grid state context - provide actual data
-        kpis = grid_state.get("kpis", {})
-        nodes_sample = list(grid_state.get("nodes", {}).items())[:10]
-        context_msg = HumanMessage(content=f"""Analyze this grid state:
+IMPORTANT: You have tools available! USE THEM to get insights:
+- identify_spatial_clusters(nodes) - Check if problems are clustered or scattered
+- analyze_storage_strategy(nodes) - Check if storage can be used
+- compare_to_baseline(current_state, time_of_day) - Detect anomalies
+- assess_cascading_failure_risk(nodes) - Check urgency
 
-City-wide Metrics:
+YOUR WORKFLOW:
+1. CALL TOOLS to get strategic insights (don't just describe data!)
+2. SYNTHESIZE tool outputs into clear recommendations
+3. ASK Planner strategic questions based on tool insights
+
+Example of GOOD workflow:
+- Call identify_spatial_clusters(nodes) → Get clustering insight
+- Call analyze_storage_strategy(nodes) → Get storage viability
+- Synthesize: "Tools show HIGH CLUSTERING in financial area + LOW STORAGE. This is a transmission issue, not capacity. Planner: Should we reroute power or reduce demand in financial district?"
+
+Example of BAD workflow:
+- Just listing node deficits without calling tools
+- Saying "I'll analyze" but not calling any tools
+
+IMPORTANT: CALL THE TOOLS! They return strategic insights you can't get from raw data.""")
+
+        if is_responding_to_planner:
+            # Responding to Planner's question
+            context_msg = HumanMessage(content=f"""The Planner just asked you: "{last_message.content[-200:]}"
+
+Respond to their specific question based on the grid data. Be direct and concise.""")
+        elif len(messages) > 2:
+            # Already had conversation, check if we need more analysis
+            context_msg = HumanMessage(content="""Review the conversation so far.
+If the Planner has a solid plan, say "The plan looks good, proceed with execution."
+Otherwise, provide any missing critical information.""")
+        else:
+            # First analysis - provide SUMMARY, tools will get full details
+            kpis = grid_state.get("kpis", {})
+            nodes = grid_state.get("nodes", {})
+            drivers = grid_state.get("drivers", {})
+
+            # Lightweight summary
+            deficit_count = len([n for n in nodes.values() if n.get("demand_mw", 0) > n.get("supply_mw", 0)])
+            low_soc_count = len([n for n in nodes.values() if n.get("storage", {}).get("soc", 0) < 0.2])
+            time_of_day = drivers.get("time_of_day", "unknown")
+
+            context_msg = HumanMessage(content=f"""Analyze this grid using your TOOLS:
+
+**City Overview:**
 - Total Demand: {kpis.get('city_demand_mw', 0):.1f} MW
 - Total Supply: {kpis.get('city_supply_mw', 0):.1f} MW
 - Deficit: {kpis.get('city_demand_mw', 0) - kpis.get('city_supply_mw', 0):.1f} MW
-- Avg Risk: {kpis.get('avg_overload_risk', 0):.3f}
-- Fairness: {kpis.get('fairness_index', 0):.3f}
+- Nodes in deficit: {deficit_count}/45
+- Low storage nodes: {low_soc_count}/45
+- Time: {time_of_day}
 
-Sample Nodes (first 10):
-{self._format_nodes_for_display(nodes_sample)}
+**Use your tools to analyze:**
+1. Call identify_spatial_clusters(nodes) - are problems clustered?
+2. Call analyze_storage_strategy(nodes) - can we use batteries?
+3. Call compare_to_baseline(current_state, time_of_day) - is this normal?
+4. Call assess_cascading_failure_risk(nodes) - how urgent?
 
-Provide a brief analysis identifying the top 3-5 critical issues.""")
+Then synthesize insights and recommend strategy to Planner.""")
 
-        # Call LLM with tools
-        response = llm_with_tools.invoke([system_msg] + messages + [context_msg])
+        # TOOL EXECUTION LOOP - Keep calling tools until LLM gives final answer
+        conversation = [system_msg] + messages + [context_msg]
+        max_tool_iterations = 5
+        iteration = 0
+        all_tool_results = []
 
-        # Extract analysis results
+        while iteration < max_tool_iterations:
+            response = llm_with_tools.invoke(conversation)
+
+            # Check if LLM wants to call tools
+            if hasattr(response, 'tool_calls') and response.tool_calls:
+                print(f"[Analyst] Calling {len(response.tool_calls)} tools...")
+
+                # Execute each tool call
+                for tool_call in response.tool_calls:
+                    tool_name = tool_call['name']
+                    tool_args = tool_call['args']
+
+                    print(f"  - {tool_name}({list(tool_args.keys())})")
+
+                    # Find and execute the tool
+                    tool_func = None
+                    for tool in analyst_tools:
+                        if hasattr(tool, 'name') and tool.name == tool_name:
+                            tool_func = tool.func
+                            break
+                        elif hasattr(tool, '__name__') and tool.__name__ == tool_name:
+                            tool_func = tool
+                            break
+
+                    if tool_func:
+                        try:
+                            # Pass grid state data if needed
+                            if 'nodes' in tool_args or tool_name == 'identify_spatial_clusters' or tool_name == 'analyze_storage_strategy':
+                                tool_args['nodes'] = nodes
+                            if 'current_state' in tool_args or tool_name == 'compare_to_baseline':
+                                tool_args['current_state'] = grid_state
+                                tool_args['time_of_day'] = drivers.get('time_of_day', '12:00')
+
+                            result = tool_func(**tool_args)
+                            all_tool_results.append({"tool": tool_name, "result": result})
+
+                            # Extract only key insights to reduce token usage
+                            insight_summary = result.get('insight', str(result)[:200])
+
+                            # Add compact tool result to conversation WITHOUT full tool_call args
+                            from langchain_core.messages import ToolMessage
+                            # Create lightweight tool call reference (without massive args)
+                            lightweight_tool_call = {
+                                'name': tool_call['name'],
+                                'id': tool_call['id'],
+                                'args': {}  # Empty args to avoid bloating context
+                            }
+                            conversation.append(AIMessage(content="", tool_calls=[lightweight_tool_call]))
+                            conversation.append(ToolMessage(
+                                content=insight_summary,
+                                tool_call_id=tool_call['id']
+                            ))
+                        except Exception as e:
+                            print(f"    Error executing {tool_name}: {e}")
+                            conversation.append(ToolMessage(
+                                content=f"Error: {str(e)}",
+                                tool_call_id=tool_call['id']
+                            ))
+
+                iteration += 1
+            else:
+                # No more tool calls - LLM gave final answer
+                break
+
+        # Extract final analysis
         analyst_output = {
             "analysis_text": response.content,
+            "tool_results": all_tool_results,
             "timestamp": grid_state.get("timestamp")
         }
 
+        # Check if Analyst is asking a question to Planner
+        is_asking_question = "?" in response.content and ("planner" in response.content.lower() or "should" in response.content.lower())
+
         return {
             **state,
-            "messages": [AIMessage(content=response.content, name="Analyst")],
+            "messages": state["messages"] + [AIMessage(content=response.content, name="Analyst")],
             "analyst_output": analyst_output,
-            "next_agent": "planner"
+            "next_agent": "planner" if not is_asking_question else "planner"
         }
 
     def _format_nodes_for_display(self, nodes_list):
@@ -278,88 +424,513 @@ Provide a brief analysis identifying the top 3-5 critical issues.""")
         analyst_output = state.get("analyst_output", {})
         grid_state = state.get("grid_state", {})
 
-        system_msg = SystemMessage(content="""You are the PlannerAgent.
-Your job:
-1. Review AnalystAgent's findings
-2. Create a specific action plan for the top 3-5 critical nodes
-3. For each node, specify: increase_supply, discharge_storage, or reduce_demand
-4. Prioritize equity-weighted zones and minimize costs
+        # Check if Analyst asked a question or if Actuator is asking for clarification
+        last_message = messages[-1] if messages else None
+        is_responding = last_message and hasattr(last_message, 'name') and "?" in last_message.content
 
-DO NOT use tools - just create a concrete action plan based on the analysis.""")
+        system_msg = SystemMessage(content="""You are the PlannerAgent - a strategic grid planner with decision-support tools.
 
-        context_msg = HumanMessage(content=f"""Analyst Report:
-{analyst_output.get('analysis_text')}
+IMPORTANT: You have tools to help make smart tradeoffs! USE THEM:
+- evaluate_tradeoffs(recommendations, constraints) - Compare FOCUSED vs SPREAD vs EQUITY strategies
+- assess_plan_feasibility(actions, grid_state) - Check if plan is actually possible
+- prioritize_by_impact(nodes, criterion) - Rank nodes by deficit/risk/equity
 
-Create a specific action plan with:
-- Node ID
-- Action type (increase_supply, discharge_storage, reduce_demand)
-- Target MW adjustment
-- Rationale
+YOUR WORKFLOW:
+1. READ Analyst's recommendations carefully
+2. CALL evaluate_tradeoffs() to understand strategic options (focused vs spread vs equity)
+3. CREATE a specific action plan for top 3-5 nodes
+4. CALL assess_plan_feasibility() to verify plan is executable
+5. OUTPUT concrete actions with exact node IDs
 
-Focus on the 3-5 most critical nodes.""")
+CRITICAL: After using tools to make decisions, your FINAL response MUST include structured actions in this EXACT format:
 
-        response = llm_with_tools.invoke([system_msg] + messages + [context_msg])
+=== ACTION PLAN ===
+Node: financial_district
+Action Type: increase_supply
+Target MW Adjustment: 5.0
+
+Node: russian_hill
+Action Type: reduce_demand
+Target MW Adjustment: 3.0
+
+Node: tenderloin
+Action Type: increase_supply
+Target MW Adjustment: 2.5
+===================
+
+Valid Action Types:
+- increase_supply (discharge battery or activate generation)
+- reduce_demand (demand response)
+- discharge_storage (explicitly discharge battery)
+
+Examples of GOOD planning:
+1. Call evaluate_tradeoffs() → See SPREAD strategy recommended
+2. Call prioritize_by_impact() → Get top 5 nodes by deficit
+3. Output structured action plan with exact format above
+
+Examples of BAD planning:
+- Answering Analyst's questions without creating action plan
+- Using JSON format instead of the simple format shown above
+- Not including "=== ACTION PLAN ===" markers
+
+REMEMBER: After calling tools and deciding strategy, you MUST output the action plan with the markers.""")
+
+        if is_responding and last_message.name == "Analyst":
+            # Analyst asked about priorities
+            context_msg = HumanMessage(content=f"""Analyst asked: "{last_message.content[-200:]}"
+
+Use your tools to decide strategy, then output your FINAL action plan using this EXACT format:
+
+=== ACTION PLAN ===
+Node: financial_district
+Action Type: increase_supply
+Target MW Adjustment: 5.0
+
+Node: russian_hill
+Action Type: reduce_demand
+Target MW Adjustment: 3.0
+===================
+
+IMPORTANT: Include the === markers and use exact node IDs.""")
+        elif is_responding and last_message.name == "Actuator":
+            # Actuator asking if actions worked
+            kpis = grid_state.get("kpis", {})
+            deficit = kpis.get('city_demand_mw', 0) - kpis.get('city_supply_mw', 0)
+            context_msg = HumanMessage(content=f"""Actuator executed actions. Current deficit: {deficit:.1f} MW
+
+If deficit < 10 MW, say "Good work, grid is stable. End optimization."
+If deficit >= 10 MW, create new action plan with === ACTION PLAN === format.""")
+        else:
+            # Create initial plan - be more direct
+            analyst_text = analyst_output.get('analysis_text', '')
+
+            context_msg = HumanMessage(content=f"""Analyst says storage is critically low. You MUST create an action plan NOW.
+
+Analyst recommendations (summary): {analyst_text[:300]}...
+
+IMMEDIATELY output your action plan in this EXACT format:
+
+=== ACTION PLAN ===
+Node: financial_district
+Action Type: increase_supply
+Target MW Adjustment: 8.0
+
+Node: russian_hill
+Action Type: reduce_demand
+Target MW Adjustment: 5.0
+
+Node: mission
+Action Type: increase_supply
+Target MW Adjustment: 6.0
+===================
+
+Use actual node IDs from the grid and real MW values. DO NOT explain, just output the plan!""")
+
+        # TOOL EXECUTION LOOP for Planner
+        conversation = [system_msg] + messages + [context_msg]
+        max_tool_iterations = 2  # Reduced to 2 to force faster plan output
+        iteration = 0
+        all_tool_results = []
+        nodes = grid_state.get("nodes", {})
+
+        # For the FIRST response, use LLM WITHOUT tools to force plan output
+        if len(messages) <= 2:  # Initial plan creation
+            llm_no_tools = self._create_llm_with_tools([])  # No tools
+            response = llm_no_tools.invoke(conversation)
+
+            # If it STILL doesn't have action plan, add one final directive
+            if "=== ACTION PLAN ===" not in response.content:
+                conversation.append(AIMessage(content=response.content, name="Planner"))
+                conversation.append(HumanMessage(content="You MUST output === ACTION PLAN === with 3 nodes NOW!"))
+                response = llm_no_tools.invoke(conversation)
+        else:
+            # Subsequent responses can use tools
+            while iteration < max_tool_iterations:
+                response = llm_with_tools.invoke(conversation)
+
+                # Check if LLM wants to call tools
+                if hasattr(response, 'tool_calls') and response.tool_calls:
+                    print(f"[Planner] Calling {len(response.tool_calls)} tools...")
+
+                    # Execute each tool call
+                    for tool_call in response.tool_calls:
+                        tool_name = tool_call['name']
+                        tool_args = tool_call['args']
+
+                        print(f"  - {tool_name}({list(tool_args.keys())})")
+
+                        # Find and execute the tool
+                        tool_func = None
+                        for tool in planner_tools:
+                            if hasattr(tool, 'name') and tool.name == tool_name:
+                                tool_func = tool.func
+                                break
+                            elif hasattr(tool, '__name__') and tool.__name__ == tool_name:
+                                tool_func = tool
+                                break
+
+                        if tool_func:
+                            try:
+                                # Inject grid_state if needed
+                                if 'grid_state' in tool_args or tool_name == 'assess_plan_feasibility':
+                                    tool_args['grid_state'] = grid_state
+
+                                result = tool_func(**tool_args)
+                                all_tool_results.append({"tool": tool_name, "result": result})
+
+                                # Extract only key insights to reduce token usage
+                                if 'strategic_insight' in result:
+                                    insight_summary = result.get('strategic_insight', '')
+                                elif 'insight' in result:
+                                    insight_summary = result.get('insight', '')
+                                else:
+                                    insight_summary = str(result)[:200]
+
+                                # Add compact tool result to conversation WITHOUT full tool_call args
+                                from langchain_core.messages import ToolMessage
+                                # Create lightweight tool call reference (without massive args)
+                                lightweight_tool_call = {
+                                    'name': tool_call['name'],
+                                    'id': tool_call['id'],
+                                    'args': {}  # Empty args to avoid bloating context
+                                }
+                                conversation.append(AIMessage(content="", tool_calls=[lightweight_tool_call]))
+                                conversation.append(ToolMessage(
+                                    content=insight_summary,
+                                    tool_call_id=tool_call['id']
+                                ))
+                            except Exception as e:
+                                print(f"    Error executing {tool_name}: {e}")
+                                conversation.append(ToolMessage(
+                                    content=f"Error: {str(e)}",
+                                    tool_call_id=tool_call['id']
+                                ))
+
+                    iteration += 1
+                else:
+                    # No more tool calls - LLM gave final answer
+                    break
+
+        # If we hit max iterations without getting action plan, force it
+        if iteration >= max_tool_iterations and "=== ACTION PLAN ===" not in response.content:
+            print(f"[Planner] Reached max tool iterations. Forcing final action plan output...")
+            # Add directive to output final plan
+            conversation.append(HumanMessage(content="""You've gathered enough insights from your tools.
+Now OUTPUT your final action plan using this EXACT format:
+
+=== ACTION PLAN ===
+Node: [node_id]
+Action Type: [increase_supply/reduce_demand/discharge_storage]
+Target MW Adjustment: [number]
+===================
+
+Create the plan NOW."""))
+            response = llm_with_tools.invoke(conversation)
 
         planner_output = {
             "plan_text": response.content,
+            "tool_results": all_tool_results,
             "timestamp": grid_state.get("timestamp"),
-            "actions": []  # Could parse from response text
+            "actions": []  # Will be parsed by Actuator
         }
+
+        # Check if Planner is asking a question to Analyst
+        is_asking_analyst = "?" in response.content and "analyst" in response.content.lower()
+
+        # FALLBACK: If no action plan was generated, create a simple default plan
+        if "=== ACTION PLAN ===" not in response.content and len(messages) <= 2:
+            print("[Planner] No action plan detected. Creating fallback plan based on deficit nodes...")
+            # Get top deficit nodes
+            nodes_list = [(nid, n) for nid, n in grid_state.get("nodes", {}).items()
+                         if n.get("demand_mw", 0) > n.get("supply_mw", 0)]
+            nodes_list.sort(key=lambda x: x[1].get("demand_mw", 0) - x[1].get("supply_mw", 0), reverse=True)
+
+            # Create simple plan for top 3 nodes
+            fallback_plan = "\n=== ACTION PLAN ===\n"
+            for i, (node_id, node_data) in enumerate(nodes_list[:3]):
+                deficit = node_data.get("demand_mw", 0) - node_data.get("supply_mw", 0)
+                action_mw = min(deficit * 0.8, 10.0)  # Address 80% of deficit, max 10 MW
+                fallback_plan += f"Node: {node_id}\n"
+                fallback_plan += f"Action Type: increase_supply\n"
+                fallback_plan += f"Target MW Adjustment: {action_mw:.1f}\n\n"
+            fallback_plan += "==================="
+
+            response_content = response.content + fallback_plan
+            planner_output["plan_text"] = response_content
+        else:
+            response_content = response.content
 
         return {
             **state,
-            "messages": [AIMessage(content=response.content, name="Planner")],
+            "messages": state["messages"] + [AIMessage(content=response_content, name="Planner")],
             "planner_output": planner_output,
-            "next_agent": "actuator"
+            "next_agent": "analyst" if is_asking_analyst else "actuator"
         }
 
     @weave.op()
     def actuator_node(self, state: AgentState) -> AgentState:
-        """Actuator Agent node - executes plan and can query planner"""
-        llm_with_tools = self._create_llm_with_tools(actuator_tools)
-
+        """Actuator Agent node - executes plan and updates grid"""
         messages = state.get("messages", [])
         planner_output = state.get("planner_output", {})
         grid_state = state.get("grid_state", {})
 
-        system_msg = SystemMessage(content="""You are the ActuatorAgent.
-Your job:
-1. Review Planner's action plan
-2. Translate each action into specific HOW instructions
-3. Specify equipment, timing, and sequence for each action
-4. Explain safety checks and constraints
+        # Step 1: Parse the plan into structured actions
+        actions = self._parse_plan_to_actions(planner_output.get("plan_text", ""))
 
-DO NOT use tools - just provide detailed execution instructions for how to implement the plan.""")
+        # Step 2: Execute actions using tools
+        executed_commands = []
+        execution_log = []
 
-        context_msg = HumanMessage(content=f"""Plan to execute:
-{planner_output.get('plan_text')}
+        for action in actions:
+            node_id = action.get("node_id")
+            action_type = action.get("action_type")
+            target_mw = action.get("target_mw", 0)
 
-For each action in the plan, specify:
-- Which equipment to use (battery, solar, gas turbine, demand response)
-- Sequence/order of operations
-- Ramp rates and timing
-- Safety checks
+            try:
+                if action_type == "increase_supply":
+                    # Use discharge_battery or assume supply increase
+                    result = discharge_battery(node_id, target_mw, duration_min=10)
+                    executed_commands.append(result)
+                    execution_log.append(f"✓ Increased supply at {node_id} by {target_mw} MW (battery discharge)")
 
-Provide concrete HOW-TO execution steps.""")
+                elif action_type == "discharge_storage":
+                    result = discharge_battery(node_id, target_mw, duration_min=5)
+                    executed_commands.append(result)
+                    execution_log.append(f"✓ Discharged storage at {node_id}: {target_mw} MW")
 
-        response = llm_with_tools.invoke([system_msg] + messages + [context_msg])
+                elif action_type == "charge_storage":
+                    result = charge_battery(node_id, target_mw, duration_min=5)
+                    executed_commands.append(result)
+                    execution_log.append(f"✓ Charged storage at {node_id}: {target_mw} MW")
 
-        actuator_output = {
-            "execution_text": response.content,
-            "commands": [],  # Could parse from response text
-            "timestamp": grid_state.get("timestamp")
-        }
+                elif action_type == "reduce_demand":
+                    # Simulate demand reduction (no specific tool, just log it)
+                    executed_commands.append({
+                        "action": "reduce_demand",
+                        "node_id": node_id,
+                        "reduction_mw": target_mw,
+                        "method": "demand_response"
+                    })
+                    execution_log.append(f"✓ Reduced demand at {node_id} by {target_mw} MW (demand response)")
+
+            except Exception as e:
+                execution_log.append(f"✗ Failed to execute {action_type} at {node_id}: {str(e)}")
+
+        # Step 3: Update the grid state with executed commands
+        updated_grid_state = self._apply_actions_to_grid(grid_state, executed_commands)
+
+        # Step 3.5: Calculate RL reward (before vs after comparison)
+        reward_data = None
+        if len(actions) > 0 and hasattr(self, 'grid_simulator'):
+            try:
+                reward_data = self.grid_simulator.calculate_rl_reward(
+                    actions,
+                    grid_state,  # BEFORE
+                    updated_grid_state  # AFTER
+                )
+                print(f"\n💰 RL REWARD CALCULATED:")
+                print(f"   Reward: {reward_data['reward']}")
+                print(f"   Cost: ${reward_data['cost_usd']}")
+                print(f"   Deficit: {reward_data['deficit_before_mw']:.1f} → {reward_data['deficit_after_mw']:.1f} MW (Δ {reward_data['deficit_improvement_mw']:+.1f})")
+                print(f"   Risk: {reward_data['risk_before']:.3f} → {reward_data['risk_after']:.3f} (Δ {reward_data['risk_improvement']:+.3f})")
+            except Exception as e:
+                print(f"⚠️  Could not calculate reward: {e}")
+
+        # Step 4: Check if we should ask Planner for clarification
+        should_query_planner = len(actions) == 0 or any(a.get("action_type") == "unknown" for a in actions)
+
+        if should_query_planner and len(executed_commands) == 0:
+            # Ask Planner for clarification
+            execution_text = f"""I reviewed the plan but need clarification:
+
+Plan received: {planner_output.get('plan_text', 'N/A')[:200]}...
+
+Issues:
+- Could not parse {len([a for a in actions if a.get('action_type') == 'unknown'])} actions
+- Node IDs may not match grid format
+
+Could you please provide:
+1. Specific node IDs (e.g., financial_district, not FD)
+2. Clear action types: increase_supply, discharge_storage, or reduce_demand
+3. Target MW values for each action
+
+Once clarified, I can execute the commands."""
+
+            actuator_output = {
+                "execution_text": execution_text,
+                "commands": executed_commands,
+                "actions_parsed": actions,
+                "timestamp": grid_state.get("timestamp"),
+                "needs_clarification": True
+            }
+        else:
+            # Create execution summary
+            execution_text = "\n".join([
+                "**Executed Actions:**",
+                *execution_log,
+                "",
+                f"**Commands executed:** {len(executed_commands)}",
+                f"**Grid updated:** {'Yes' if executed_commands else 'No'}",
+                "",
+                "**Question for Planner:** Did these actions sufficiently address the deficit? Should we continue?"
+            ])
+
+            actuator_output = {
+                "execution_text": execution_text,
+                "commands": executed_commands,
+                "actions_parsed": actions,
+                "timestamp": grid_state.get("timestamp"),
+                "reward_data": reward_data  # Include RL reward
+            }
+
+        # Check if Actuator needs clarification from Planner
+        needs_clarification = actuator_output.get("needs_clarification", False)
 
         return {
             **state,
-            "messages": [AIMessage(content=response.content, name="Actuator")],
+            "messages": state["messages"] + [AIMessage(content=execution_text, name="Actuator")],
             "actuator_output": actuator_output,
-            "next_agent": "end"
+            "grid_state": updated_grid_state,  # Return updated grid
+            "next_agent": "planner" if needs_clarification else "end"
+        }
+
+    def _parse_plan_to_actions(self, plan_text: str) -> list:
+        """Parse natural language plan into structured actions"""
+        import re
+
+        actions = []
+
+        # Look for ACTION PLAN section
+        action_plan_match = re.search(r'===\s*ACTION PLAN\s*===(.+?)===', plan_text, re.DOTALL)
+
+        if action_plan_match:
+            action_section = action_plan_match.group(1)
+        else:
+            # Fallback: look for any section with "Node:" patterns
+            action_section = plan_text
+
+        # Split by "Node:" to get each action
+        node_sections = re.split(r'\n\s*Node:\s*', action_section)
+
+        for section in node_sections:
+            if not section.strip():
+                continue
+
+            try:
+                # Extract node ID (first line after "Node:")
+                lines = section.strip().split('\n')
+                if not lines:
+                    continue
+
+                node_id = lines[0].strip().lower().replace(' ', '_')
+
+                # Extract action type
+                action_match = re.search(r'Action Type:\s*([^\n]+)', section, re.IGNORECASE)
+                if not action_match:
+                    continue
+
+                action_text = action_match.group(1).strip().lower()
+
+                # Map to action types
+                if 'increase_supply' in action_text or ('increase' in action_text and 'supply' in action_text):
+                    action_type = "increase_supply"
+                elif 'discharge_storage' in action_text or 'discharge' in action_text:
+                    action_type = "discharge_storage"
+                elif 'charge_storage' in action_text or 'charge' in action_text:
+                    action_type = "charge_storage"
+                elif 'reduce_demand' in action_text or ('reduce' in action_text and 'demand' in action_text):
+                    action_type = "reduce_demand"
+                else:
+                    action_type = "unknown"
+
+                # Extract MW value
+                mw_match = re.search(r'Target MW Adjustment:\s*[\+\-]?\s*(\d+(?:\.\d+)?)', section, re.IGNORECASE)
+                target_mw = float(mw_match.group(1)) if mw_match else 0
+
+                actions.append({
+                    "node_id": node_id,
+                    "action_type": action_type,
+                    "target_mw": target_mw
+                })
+
+            except Exception as e:
+                print(f"Warning: Could not parse section: {str(e)}")
+                continue
+
+        return actions
+
+    def _apply_actions_to_grid(self, grid_state: dict, commands: list) -> dict:
+        """Apply executed commands to update grid state"""
+        import copy
+        updated_state = copy.deepcopy(grid_state)
+
+        nodes = updated_state.get("nodes", {})
+
+        for cmd in commands:
+            node_id = cmd.get("node_id")
+
+            # Find matching node (try exact match first, then fuzzy)
+            if node_id not in nodes:
+                # Try to find by partial match
+                for key in nodes.keys():
+                    if node_id in key or key in node_id:
+                        node_id = key
+                        break
+
+            if node_id not in nodes:
+                continue
+
+            node = nodes[node_id]
+
+            # Apply changes based on command type
+            cmd_type = cmd.get("command") or cmd.get("action")  # Support both keys
+
+            if cmd_type == "discharge_battery":
+                power_mw = cmd.get("power_mw", 0)
+                node["supply_mw"] += power_mw  # Increase supply
+                node["storage"]["soc"] = max(0, node["storage"]["soc"] - 0.05)  # Decrease SOC
+
+            elif cmd_type == "charge_battery":
+                power_mw = cmd.get("power_mw", 0)
+                node["supply_mw"] -= power_mw  # Decrease supply (used for charging)
+                node["storage"]["soc"] = min(1.0, node["storage"]["soc"] + 0.05)  # Increase SOC
+
+            elif cmd_type == "reduce_demand":
+                reduction_mw = cmd.get("reduction_mw", 0)
+                node["demand_mw"] -= reduction_mw
+
+            # Recalculate balance
+            node["net_load_mw"] = node["demand_mw"] - node["supply_mw"]
+
+        # Recalculate KPIs
+        updated_state["kpis"] = self._recalculate_kpis(nodes)
+
+        return updated_state
+
+    def _recalculate_kpis(self, nodes: dict) -> dict:
+        """Recalculate city-wide KPIs after actions"""
+        total_demand = sum(n["demand_mw"] for n in nodes.values())
+        total_supply = sum(n["supply_mw"] for n in nodes.values())
+        unserved = max(0, total_demand - total_supply)
+        avg_risk = sum(n["risk"]["overload"] for n in nodes.values()) / len(nodes)
+
+        return {
+            "city_demand_mw": round(total_demand, 2),
+            "city_supply_mw": round(total_supply, 2),
+            "unserved_energy_proxy_mw": round(unserved, 2),
+            "avg_overload_risk": round(avg_risk, 3),
+            "fairness_index": 0.998  # Simplified for now
         }
 
     def should_continue(self, state: AgentState) -> str:
         """Router function to determine next agent"""
         next_agent = state.get("next_agent", "end")
+        messages = state.get("messages", [])
+
+        # Prevent infinite loops - force end after max_turns
+        if len(messages) > self.max_turns:
+            print(f"[System] Max turns ({self.max_turns}) reached. Ending conversation.")
+            return END
 
         if next_agent == "end":
             return END

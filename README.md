@@ -21,25 +21,40 @@ SynErgi uses three specialized AI agents that collaborate to analyze, plan, and 
 ## Architecture
 
 ```
-┌─────────────────┐
-│  Digital Twin   │ (Grid State Data)
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ Analyst Agent   │ (Analyze Issues)
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ Planner Agent   │ (Create Action Plan)
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ Actuator Agent  │ (Execute Plan)
-└─────────────────┘
+                    ┌─────────────────┐
+                    │  Digital Twin   │
+                    │  (Grid State)   │
+                    └────────┬────────┘
+                             │
+              ┌──────────────┴──────────────┐
+              │                             │
+              ▼                             ▼
+     ┌─────────────────┐         ┌─────────────────┐
+     │ Analyst Agent   │◄───────►│ Planner Agent   │
+     │ (Analyze State) │         │ (Create Plans)  │
+     └────────┬────────┘         └────────┬────────┘
+              │                           │
+              └───────────┬───────────────┘
+                          │
+                          ▼
+                 ┌─────────────────┐
+                 │ Actuator Agent  │
+                 │ (Execute Plans) │
+                 └────────┬────────┘
+                          │
+                          ▼
+                 ┌─────────────────┐
+                 │  Digital Twin   │
+                 │    (Update)     │
+                 └─────────────────┘
 ```
+
+**Agent Communication Flow:**
+- Digital Twin provides initial state to both Analyst and Planner
+- Analyst ↔ Planner communicate back-and-forth to refine analysis and plans
+- Planner ↔ Actuator can query each other for clarification
+- Actuator can loop back to Planner if plan needs adjustment
+- Actuator updates Digital Twin with executed changes
 
 ## Installation
 

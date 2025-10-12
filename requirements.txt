@@ -19,5 +19,7 @@ langchain-openai>=0.0.5  # LangChain OpenAI integration
 
 # Utilities
 pydantic>=2.0.0  # For structured outputs
+jsonschema
+numpy
 
 # Note: Qwen 2.5 will be accessed via Weave/W&B API

@@ -1,0 +1,45 @@
+{
+    "type": "object",
+    "required": ["candidates", "decision"],
+    "properties": {
+      "candidates": {
+        "type": "array",
+        "minItems": 2,
+        "items": {
+          "type": "object",
+          "required": ["id", "actions", "metrics"],
+          "properties": {
+            "id": {"type": "string"},
+            "actions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["node","action"],
+                "properties": {
+                  "node": {"type":"string"},
+                  "action": {"type":"string"},
+                  "param": {"type":["number","null"]}
+                }
+              }
+            },
+            "metrics": {
+              "type": "object",
+              "required": ["cost","risk"],
+              "properties": {
+                "cost": {"type":"number"},
+                "risk": {"type":"number"}
+              }
+            }
+          }
+        }
+      },
+      "decision": {
+        "type": "object",
+        "required": ["chosen_plan_id"],
+        "properties": {
+          "chosen_plan_id": {"type":"string"}
+        }
+      }
+    }
+  }
+  

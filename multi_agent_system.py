@@ -7,6 +7,7 @@ import os
 from typing import TypedDict, Annotated, Sequence
 from dotenv import load_dotenv
 import operator
+import weave
 
 from langgraph.graph import StateGraph, END
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
@@ -20,6 +21,9 @@ from agents.tools import (
 )
 
 load_dotenv()
+
+# Initialize Weave for tracing
+weave.init(os.getenv("WEAVE_PROJECT", "synergi-grid-optimization"))
 
 
 # Define the shared state for all agents
@@ -181,6 +185,7 @@ class SynErgiMultiAgentSystem:
 
         return llm.bind_tools(tools)
 
+    @weave.op()
     def digital_twin_node(self, state: AgentState) -> AgentState:
         """Digital Twin node - provides grid state data"""
         grid_state = state.get("grid_state", {})
@@ -201,6 +206,7 @@ State data ready for Analyst."""
             "next_agent": "analyst"
         }
 
+    @weave.op()
     def analyst_node(self, state: AgentState) -> AgentState:
         """Analyst Agent node - analyzes grid and responds to queries"""
         llm_with_tools = self._create_llm_with_tools(analyst_tools)
@@ -263,6 +269,7 @@ Provide a brief analysis identifying the top 3-5 critical issues.""")
             output.append(f"  {node_id}: Demand={demand:.1f}MW, Supply={supply:.1f}MW, Balance={balance:+.1f}MW, Risk={risk:.2f}, SOC={soc:.2f}")
         return "\n".join(output)
 
+    @weave.op()
     def planner_node(self, state: AgentState) -> AgentState:
         """Planner Agent node - creates plans and queries analyst/twin"""
         llm_with_tools = self._create_llm_with_tools(planner_tools)
@@ -306,6 +313,7 @@ Focus on the 3-5 most critical nodes.""")
             "next_agent": "actuator"
         }
 
+    @weave.op()
     def actuator_node(self, state: AgentState) -> AgentState:
         """Actuator Agent node - executes plan and can query planner"""
         llm_with_tools = self._create_llm_with_tools(actuator_tools)
@@ -415,6 +423,7 @@ Provide concrete HOW-TO execution steps.""")
 
         return workflow.compile()
 
+    @weave.op()
     def run(self, initial_grid_state: dict) -> dict:
         """Run the multi-agent system for one grid optimization cycle"""
         initial_state = AgentState(

@@ -1,12 +1,23 @@
 # SynErgi - Multi-Agent RL Grid Optimization System
 # Requirements file for Python dependencies
 
-# Core dependencies (placeholders for future integration)
-# weave>=0.50.0
-# openpipe>=0.1.0
+# Weave & W&B for LLM hosting and tracing
+weave>=0.50.0
+wandb>=0.16.0
 
-# Note: Current implementation uses only Python standard library
-# Additional dependencies will be added when integrating:
-# - Weave for tracing and observability
-# - OpenPipe for RL policy hosting
-# - Serverless deployment frameworks (Cloud Run, Azure Functions)
+# LangChain & LangGraph for multi-agent orchestration
+langchain>=0.1.0
+langgraph>=0.0.40
+langchain-core>=0.1.0
+
+# Environment variables
+python-dotenv>=1.0.0
+
+# LLM inference
+openai>=1.0.0  # For OpenAI-compatible API calls to Qwen
+langchain-openai>=0.0.5  # LangChain OpenAI integration
+
+# Utilities
+pydantic>=2.0.0  # For structured outputs
+
+# Note: Qwen 2.5 will be accessed via Weave/W&B API

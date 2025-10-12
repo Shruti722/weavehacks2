@@ -1,0 +1,107 @@
+{
+  "sim": {
+    "frame_id": "sf_000000",
+    "parent_frame_id": null,
+    "sim_time": "2025-10-11T17:00:00",
+    "generated_at": "2025-10-11T17:00:01Z",
+    "tick_minutes": 5
+  },
+
+  "drivers": {
+    "time_of_day": "17:00",
+    "weekday": true,
+    "weather": { "temp_c": 0.0, "solar_irradiance_wm2": 0.0, "wind_mps": 0.0 },
+    "events": [],
+    "price": { "da_usd_per_kwh": 0.0, "rt_usd_per_kwh": 0.0 }
+  },
+
+  "nodes": {
+    "financial_district":   { "meta": {"name":"Financial District","zone":"Core","equity_weight":1.0}, "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+    "chinatown":            { "meta": {"name":"Chinatown","zone":"Core","equity_weight":1.0},          "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+    "north_beach":          { "meta": {"name":"North Beach","zone":"Core","equity_weight":1.0},         "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+    "russian_hill":         { "meta": {"name":"Russian Hill","zone":"Core","equity_weight":1.0},        "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+    "nob_hill":             { "meta": {"name":"Nob Hill","zone":"Core","equity_weight":1.0},            "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+    "tenderloin":           { "meta": {"name":"Tenderloin","zone":"Core","equity_weight":1.2},          "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+    "civic_center":         { "meta": {"name":"Civic Center","zone":"Core","equity_weight":1.0},        "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+    "hayes_valley":         { "meta": {"name":"Hayes Valley","zone":"Core","equity_weight":1.0},        "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+    "western_addition":     { "meta": {"name":"Western Addition","zone":"Core","equity_weight":1.0},    "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+    "lower_pacific_heights":{ "meta": {"name":"Lower Pacific Heights","zone":"Core","equity_weight":1.0},"demand_mw":0,"supply_mw":0,"net_load_mw":0,"price_signal":0,"storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0},"flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0},"risk":{"overload":0,"n_1_margin":0},"flags":{"outage":false,"is_event_hotspot":false} },
+    "pacific_heights":      { "meta": {"name":"Pacific Heights","zone":"Core","equity_weight":1.0},     "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+    "marina":               { "meta": {"name":"Marina","zone":"NW","equity_weight":1.0},               "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+    "presidio":             { "meta": {"name":"Presidio","zone":"NW","equity_weight":1.0},             "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+
+    "inner_richmond":       { "meta": {"name":"Inner Richmond","zone":"NW","equity_weight":1.0},       "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+    "outer_richmond":       { "meta": {"name":"Outer Richmond","zone":"NW","equity_weight":1.0},       "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+    "seacliff":             { "meta": {"name":"Seacliff","zone":"NW","equity_weight":1.0},             "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+
+    "golden_gate_park":     { "meta": {"name":"Golden Gate Park","zone":"West","equity_weight":1.0},   "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+    "haight_ashbury":       { "meta": {"name":"Haight-Ashbury","zone":"West","equity_weight":1.0},     "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+
+    "inner_sunset":         { "meta": {"name":"Inner Sunset","zone":"West","equity_weight":1.0},       "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+    "outer_sunset":         { "meta": {"name":"Outer Sunset","zone":"West","equity_weight":1.0},       "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+    "parkside":             { "meta": {"name":"Parkside","zone":"West","equity_weight":1.0},           "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+    "lakeshore":            { "meta": {"name":"Lakeshore","zone":"SW","equity_weight":1.0},            "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+
+    "oceanview":            { "meta": {"name":"Oceanview","zone":"South","equity_weight":1.1},         "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+    "ingleside":            { "meta": {"name":"Ingleside","zone":"South","equity_weight":1.1},         "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+    "sunnyside":            { "meta": {"name":"Sunnyside","zone":"South","equity_weight":1.0},         "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+    "west_portal":          { "meta": {"name":"West Portal","zone":"South","equity_weight":1.0},       "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+    "forest_hill":          { "meta": {"name":"Forest Hill","zone":"South","equity_weight":1.0},       "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+
+    "twin_peaks":           { "meta": {"name":"Twin Peaks","zone":"Hills","equity_weight":1.0},        "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+    "noe_valley":           { "meta": {"name":"Noe Valley","zone":"Hills","equity_weight":1.0},        "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+    "glen_park":            { "meta": {"name":"Glen Park","zone":"Hills","equity_weight":1.0},         "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+
+    "bernal_heights":       { "meta": {"name":"Bernal Heights","zone":"SE","equity_weight":1.1},       "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+    "mission":              { "meta": {"name":"Mission","zone":"SE","equity_weight":1.0},              "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+    "potrero_hill":         { "meta": {"name":"Potrero Hill","zone":"SE","equity_weight":1.0},         "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+    "dogpatch":             { "meta": {"name":"Dogpatch","zone":"SE","equity_weight":1.0},             "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+    "mission_bay":          { "meta": {"name":"Mission Bay","zone":"SE","equity_weight":1.0},          "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+    "south_of_market":      { "meta": {"name":"SoMa","zone":"SE","equity_weight":1.0},                 "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+    "south_beach":          { "meta": {"name":"South Beach","zone":"SE","equity_weight":1.0},          "demand_mw":0, "supply_mw":0, "net_load_mw":0, "price_signal":0, "storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0}, "flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0}, "risk":{"overload":0,"n_1_margin":0}, "flags":{"outage":false,"is_event_hotspot":false} },
+
+    "treasure_island":      { "meta": {"name":"Treasure/Yerba Buena Island","zone":"Bay","equity_weight":1.0},"demand_mw":0,"supply_mw":0,"net_load_mw":0,"price_signal":0,"storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0},"flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0},"risk":{"overload":0,"n_1_margin":0},"flags":{"outage":false,"is_event_hotspot":false} },
+
+    "bayview_hunters_point":{ "meta": {"name":"Bayview–Hunters Point","zone":"SE","equity_weight":1.2},"demand_mw":0,"supply_mw":0,"net_load_mw":0,"price_signal":0,"storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0},"flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0},"risk":{"overload":0,"n_1_margin":0},"flags":{"outage":false,"is_event_hotspot":false} },
+    "visitacion_valley":    { "meta": {"name":"Visitacion Valley","zone":"SE","equity_weight":1.1},    "demand_mw":0,"supply_mw":0,"net_load_mw":0,"price_signal":0,"storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0},"flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0},"risk":{"overload":0,"n_1_margin":0},"flags":{"outage":false,"is_event_hotspot":false} },
+    "excelsior":            { "meta": {"name":"Excelsior","zone":"SE","equity_weight":1.1},            "demand_mw":0,"supply_mw":0,"net_load_mw":0,"price_signal":0,"storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0},"flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0},"risk":{"overload":0,"n_1_margin":0},"flags":{"outage":false,"is_event_hotspot":false} },
+    "crocker_amazon":       { "meta": {"name":"Crocker-Amazon","zone":"SE","equity_weight":1.0},       "demand_mw":0,"supply_mw":0,"net_load_mw":0,"price_signal":0,"storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0},"flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0},"risk":{"overload":0,"n_1_margin":0},"flags":{"outage":false,"is_event_hotspot":false} },
+
+    "westwood_park":        { "meta": {"name":"Westwood Park","zone":"South","equity_weight":1.0},     "demand_mw":0,"supply_mw":0,"net_load_mw":0,"price_signal":0,"storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0},"flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0},"risk":{"overload":0,"n_1_margin":0},"flags":{"outage":false,"is_event_hotspot":false} },
+    "balboa_park":          { "meta": {"name":"Balboa Park","zone":"South","equity_weight":1.0},       "demand_mw":0,"supply_mw":0,"net_load_mw":0,"price_signal":0,"storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0},"flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0},"risk":{"overload":0,"n_1_margin":0},"flags":{"outage":false,"is_event_hotspot":false} },
+
+    "yosemite_slopes":      { "meta": {"name":"Forest Knolls/Clarendon (Twin Peaks West)","zone":"Hills","equity_weight":1.0},"demand_mw":0,"supply_mw":0,"net_load_mw":0,"price_signal":0,"storage":{"soc":0,"power_mw_limit":0,"energy_mwh_cap":0},"flex":{"available_mw":0,"active_dr_percent":0,"fatigue":0,"cooldown_steps":0},"risk":{"overload":0,"n_1_margin":0},"flags":{"outage":false,"is_event_hotspot":false} }
+  },
+
+  "edges": {
+    "financial_district|south_of_market": { "active": true, "flow_mw": 0, "capacity_mw": 0, "loading": 0 },
+    "south_of_market|mission_bay":        { "active": true, "flow_mw": 0, "capacity_mw": 0, "loading": 0 },
+    "mission|potrero_hill":               { "active": true, "flow_mw": 0, "capacity_mw": 0, "loading": 0 },
+    "potrero_hill|dogpatch":              { "active": true, "flow_mw": 0, "capacity_mw": 0, "loading": 0 },
+    "dogpatch|bayview_hunters_point":     { "active": true, "flow_mw": 0, "capacity_mw": 0, "loading": 0 },
+    "mission|bernal_heights":             { "active": true, "flow_mw": 0, "capacity_mw": 0, "loading": 0 },
+    "noe_valley|glen_park":               { "active": true, "flow_mw": 0, "capacity_mw": 0, "loading": 0 },
+    "noe_valley|mission":                 { "active": true, "flow_mw": 0, "capacity_mw": 0, "loading": 0 },
+    "twin_peaks|inner_sunset":            { "active": true, "flow_mw": 0, "capacity_mw": 0, "loading": 0 },
+    "inner_sunset|outer_sunset":          { "active": true, "flow_mw": 0, "capacity_mw": 0, "loading": 0 },
+    "inner_richmond|outer_richmond":      { "active": true, "flow_mw": 0, "capacity_mw": 0, "loading": 0 },
+    "inner_richmond|golden_gate_park":    { "active": true, "flow_mw": 0, "capacity_mw": 0, "loading": 0 },
+    "marina|presidio":                    { "active": true, "flow_mw": 0, "capacity_mw": 0, "loading": 0 },
+    "presidio|seacliff":                  { "active": true, "flow_mw": 0, "capacity_mw": 0, "loading": 0 },
+    "western_addition|pacific_heights":   { "active": true, "flow_mw": 0, "capacity_mw": 0, "loading": 0 },
+    "pacific_heights|marina":             { "active": true, "flow_mw": 0, "capacity_mw": 0, "loading": 0 },
+    "chinatown|north_beach":              { "active": true, "flow_mw": 0, "capacity_mw": 0, "loading": 0 },
+    "financial_district|chinatown":       { "active": true, "flow_mw": 0, "capacity_mw": 0, "loading": 0 },
+    "south_beach|mission_bay":            { "active": true, "flow_mw": 0, "capacity_mw": 0, "loading": 0 },
+    "treasure_island|south_beach":        { "active": true, "flow_mw": 0, "capacity_mw": 0, "loading": 0 }
+  },
+
+  "kpis": {
+    "city_demand_mw": 0,
+    "city_supply_mw": 0,
+    "unserved_energy_proxy_mw": 0,
+    "avg_overload_risk": 0,
+    "total_curtailment_mw": 0,
+    "fairness_index": 0
+  }
+}

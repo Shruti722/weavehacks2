@@ -1,0 +1,12 @@
+# SynErgi - Multi-Agent RL Grid Optimization System
+# Requirements file for Python dependencies
+
+# Core dependencies (placeholders for future integration)
+# weave>=0.50.0
+# openpipe>=0.1.0
+
+# Note: Current implementation uses only Python standard library
+# Additional dependencies will be added when integrating:
+# - Weave for tracing and observability
+# - OpenPipe for RL policy hosting
+# - Serverless deployment frameworks (Cloud Run, Azure Functions)

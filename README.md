@@ -1,4 +1,5 @@
-# SynErgi - Multi-Agent Grid Optimization System Presentation: [Link](https://synergi.lovable.app/)
+# SynErgi - Multi-Agent Grid Optimization System 
+## Presentation: [Link](https://synergi.lovable.app/)
 
 A multi-agent reinforcement learning system for optimizing power grid operations in San Francisco, using LangGraph for agent orchestration and W&B Inference for LLM-powered reasoning.
 
